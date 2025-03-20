@@ -3,7 +3,7 @@ import re
 import bcrypt
 
 DATABASE_FILE = "comp3334.db"
-def initDatabase():
+def init_database():
     conn = sqlite3.connect(DATABASE_FILE);
     cursor = conn.cursor();
     cursor.execute('''
@@ -16,7 +16,13 @@ def initDatabase():
     conn.commit()
     conn.close()
 
-def registerUser():
+def hash_password(input_password):
+    return bcrypt.hashpw(input_password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+
+def check_password(input_password, hashed_password):
+    return bcrypt.checkpw(input_password.encode("utf-8"), hashed_password.encode("utf-8"))
+
+def register_user():
     conn = sqlite3.connect(DATABASE_FILE)
     cursor = conn.cursor()
     while True:
@@ -41,10 +47,10 @@ def registerUser():
             print("[ERROR] Passwords do not match. Please try again.")
         else:
             break
-    hashedPassword = bcrypt.hashpw(password1.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+    hashedPassword = hash_password(password1)
     cursor.execute("INSERT INTO users (username, password) VALUES (?, ?)", (username, hashedPassword))
     conn.commit()
-    print("[STATUS] User registered successfully!")
+    print("[STATUS] Username '{0}' registered successfully!".format(username))
     conn.close()
 
 def userManagement():
