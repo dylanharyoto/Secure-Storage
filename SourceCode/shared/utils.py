@@ -1,5 +1,6 @@
 import sqlite3
 import bcrypt
+import os
 
 def init_database(database_file_name):
     # Initialize the database and create the users table if it does not exist
@@ -9,6 +10,7 @@ def init_database(database_file_name):
         CREATE TABLE IF NOT EXISTS users (
             username TEXT PRIMARY KEY,
             password TEXT NOT NULL
+            key TEXT NOT NULL
         )
     ''')
     conn.commit()
@@ -21,3 +23,11 @@ def hash_password(input_password):
 def check_password(input_password, hashed_password):
     # Verify a password against a stored hash
     return bcrypt.checkpw(input_password.encode("utf-8"), hashed_password.encode("utf-8"))
+
+def generate_aes():
+    return os.urandom(16)
+
+def split_aes(key):
+    key_part_server = key[:8]  # First 64 bits
+    key_part_client = key[8:]  # Last 64 bits
+    return key_part_server, key_part_client

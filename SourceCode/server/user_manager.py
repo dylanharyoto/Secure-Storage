@@ -1,5 +1,5 @@
 import sqlite3
-from SourceCode.shared.utils import check_password, hash_password
+from SourceCode.shared.utils import check_password, generate_aes, hash_password, split_aes
 
 def register_user(database_file_name):
     conn = sqlite3.connect(database_file_name)
@@ -45,7 +45,9 @@ def register_user(database_file_name):
             else:
                 flag_password2 = True
     hashed_password = hash_password(password1)
-    cursor.execute("INSERT INTO users (username, password) VALUES (?, ?)", (username, hashed_password))
+    aes_key = generate_aes();
+    client_key, server_key = split_aes(aes_key)
+    cursor.execute("INSERT INTO users (username, password, key) VALUES (?, ?, ?)", (username, hashed_password, server_key))
     conn.commit()
     print(f"[STATUS] Username '{username}' registered successfully!")
     conn.close()
