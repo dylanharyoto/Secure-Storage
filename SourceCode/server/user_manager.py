@@ -1,32 +1,8 @@
 import sqlite3
-import re
-import bcrypt
+from SourceCode.shared.utils import check_password, hash_password
 
-DATABASE_FILE = "Users.db"
-
-def init_database():
-    # Initialize the database and create the users table if it does not exist
-    conn = sqlite3.connect(DATABASE_FILE)
-    cursor = conn.cursor()
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS users (
-            username TEXT PRIMARY KEY,
-            password TEXT NOT NULL
-        )
-    ''')
-    conn.commit()
-    conn.close()
-
-def hash_password(input_password):
-    # Hash a password using bcrypt
-    return bcrypt.hashpw(input_password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
-
-def check_password(input_password, hashed_password):
-    # Verify a password against a stored hash
-    return bcrypt.checkpw(input_password.encode("utf-8"), hashed_password.encode("utf-8"))
-
-def register_user():
-    conn = sqlite3.connect(DATABASE_FILE)
+def register_user(database_file_name):
+    conn = sqlite3.connect(database_file_name)
     cursor = conn.cursor()
     flag_username = False
     flag_password1 = False
@@ -74,8 +50,8 @@ def register_user():
     print(f"[STATUS] Username '{username}' registered successfully!")
     conn.close()
 
-def login_user():
-    conn = sqlite3.connect(DATABASE_FILE)
+def login_user(database_file_name):
+    conn = sqlite3.connect(database_file_name)
     cursor = conn.cursor()
     flag_username = False
     while not flag_username:
@@ -105,8 +81,8 @@ def login_user():
         else:
             print("[ERROR] Incorrect password. Please try again.")
 
-def reset_password():
-    conn = sqlite3.connect(DATABASE_FILE)
+def reset_password(database_file_name):
+    conn = sqlite3.connect(database_file_name)
     cursor = conn.cursor()
     flag_username, flag_current_password, flag_new_password1, flag_new_password2 = False, False, False, False
     username, stored_password, new_password1 = None, None, None
@@ -163,27 +139,3 @@ def reset_password():
     conn.commit()
     print(f"[STATUS] Password for '{username}' has been successfully reset.")
     conn.close()
-
-def user_management():
-    init_database()
-    while True:
-        print("\nUser Management Menu:")
-        print("1. Register User")
-        print("2. Log In")
-        print("3. Reset Password")
-        print("4. Exit")
-        choice = input("Enter your choice:\n> ").strip()
-        if choice == "1":
-            register_user()
-        elif choice == "2":
-            login_user()
-        elif choice == "3":
-            reset_password()
-        elif choice == "4":
-            print("Exiting User Management...")
-            break
-        else:
-            print("Invalid choice. Please try again.")
-
-if __name__ == "__main__":
-    user_management()
