@@ -1,4 +1,4 @@
-from SourceCode.server.user_management import register_user_IO, login_user_IO, reset_password_IO
+from SourceCode.server.user_management import UserManagement
 from SourceCode.shared.utils import init_database
 import sys
 import os
@@ -16,11 +16,11 @@ def user_management():
         print("4. Exit")
         choice = input("Enter your choice:\n> ").strip()
         if choice == "1":
-            register_user_IO()
+            client_aes = UserManagement.register_user_IO()
         elif choice == "2":
-            login_user_IO()
+            status = UserManagement.login_user_IO()
         elif choice == "3":
-            reset_password_IO()
+            status = UserManagement.reset_password_IO()
         elif choice == "4":
             print("Exiting User Management...")
             break
