@@ -2,9 +2,6 @@ import sqlite3
 import os
 from SourceCode.shared.utils import generate_aes, hash_password, split_aes
 
-# Constants
-DB_FILENAME="users.db"
-
 class Server:
     def __init__(self, db_filename="users.db"):
         self.db_filename = os.path.join(os.path.dirname(__file__), db_filename)
@@ -64,3 +61,4 @@ class Server:
             self.conn.commit()
         finally:
             self.close_conn()
+
