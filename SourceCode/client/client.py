@@ -1,9 +1,9 @@
-from SourceCode.client.user_management import UserManagement
-from SourceCode.shared.utils import init_database
 import sys
 import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
+from SourceCode.client.user_management import UserManagement
+from SourceCode.shared.utils import init_database
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 DATABASE_FILE = "users.db"
 
 def user_management():
