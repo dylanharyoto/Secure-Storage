@@ -4,6 +4,7 @@ from SourceCode.shared.utils import check_username_regex, check_password_regex
 class UserManagement:
     def __init__(self):
         self.server = Server()
+        
     def register_user_IO(self):
         flag_username, flag_password1, flag_password2 = False, False, False
         username, password1, password2 = None, None, None

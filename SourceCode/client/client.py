@@ -1,17 +1,14 @@
 import sys
 import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
-
 from SourceCode.client.user_management import UserManagement
 from SourceCode.shared.utils import init_database
 
 class Client:
-    def __init__(self, database_file):
-        self.database_file = database_file
+    def __init__(self):
         self.user_management = UserManagement()
 
     def run(self):
-        init_database(self.database_file)
         while True:
             print("\nUser Management Menu:")
             print("1. Register User")
@@ -38,6 +35,5 @@ class Client:
                 print("Invalid choice. Please try again.")
 
 if __name__ == "__main__":
-    DATABASE_FILE = os.path.join(os.path.dirname(__file__), "users.db")
-    client = Client(DATABASE_FILE)
+    client = Client()
     client.run()

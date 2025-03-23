@@ -3,19 +3,21 @@ import bcrypt
 import re
 import os
 
-def init_database(database_file_name):
-    # Initialize the database and create the users table if it does not exist
-    conn = sqlite3.connect(database_file_name)
+def init_database(db_file_name, table_name):
+    """Initialize the database and create the specified table if it does not exist."""
+    conn = sqlite3.connect(db_file_name)
     cursor = conn.cursor()
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS users (
-            username TEXT PRIMARY KEY,
-            password TEXT NOT NULL, 
-            key TEXT NOT NULL
-        )
-    ''')
-    conn.commit()
-    conn.close()
+    try:
+        cursor.execute(f'''
+            CREATE TABLE IF NOT EXISTS {table_name} (
+                username TEXT PRIMARY KEY,
+                password TEXT NOT NULL, 
+                key TEXT NOT NULL
+            )
+        ''')
+        conn.commit()
+    finally:
+        conn.close()
 
 def hash_password(input_password):
     return bcrypt.hashpw(input_password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
