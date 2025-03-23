@@ -1,4 +1,4 @@
-from SourceCode.server.user_management import UserManagement
+from SourceCode.client.user_management import UserManagement
 from SourceCode.shared.utils import init_database
 import sys
 import os
