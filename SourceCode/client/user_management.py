@@ -85,61 +85,58 @@ class UserManagement:
         finally:
             self.server.close_conn()
 
-
-    def reset_password_IO():
-        server.open_conn()
-        flag_username, flag_old_password, flag_new_password1, flag_new_password2 = False, False, False, False
-        username, old_password, new_password1, new_password2 = None, None, None, None
-        while not (flag_username and flag_old_password and flag_new_password1 and flag_new_password2):
-            if not flag_username:
-                username = input('Enter your username address (or type "q" for EXIT):\n> ').strip()
-                if username == "q":
-                    server.close_conn()
-                    return
-                if not check_username_regex(username):
-                    print('[ERROR] Invalid email format. Please enter a valid username address.')
-                    continue
-                if not server.check_username_exists(username):
-                    print("[ERROR] username not found. Please try again.")
-                    continue
-                flag_username = True
-            elif not flag_old_password:
-                old_password = input('Enter your old password (or type "q" for EXIT, "b" for BACK):\n> ').strip()
-                if old_password == "q":
-                    server.close_conn()
-                    return
-                if old_password == "b":
-                    flag_username = False
-                    continue
-                if not server.login_user(username, old_password):                
-                    print("[ERROR] Incorrect password. Please try again.")
-                    continue
-                flag_old_password = True
-            elif not flag_new_password1:
-                new_password1 = input('Enter a new password with at least 8 characters (or type "q" for EXIT, "b" for BACK):\n> ').strip()
-                if new_password1 == "q":
-                    server.close_conn()
-                    return
-                if new_password1 == "b":
-                    new_password1 = False
-                    continue
-                if not check_password_regex(new_password1):
-                    print("[ERROR] Password must be at least 8 characters long!")
-                    continue
-                flag_new_password1 = True
-            elif not flag_new_password2:
-                new_password2 = input('Confirm your new password (or type "q" for EXIT, "b" for BACK):\n> ').strip()
-                if new_password2 == "q":
-                    server.close_conn()
-                    return
-                if new_password2 == "b":
-                    flag_new_password1 = False
-                    continue
-                if new_password2 != new_password1:
-                    print("[ERROR] Passwords do not match! Please try again.")
-                    continue
-                flag_new_password2 = True
-        server.reset_password(username, new_password1)
-        print(f"[STATUS] Password for '{username}' has been successfully reset.")
-        server.close_conn()
-        return True
+    def reset_password_IO(self):
+        self.server.open_conn()
+        try:
+            flag_username, flag_old_password, flag_new_password1, flag_new_password2 = False, False, False, False
+            username, old_password, new_password1, new_password2 = None, None, None, None
+            while not (flag_username and flag_old_password and flag_new_password1 and flag_new_password2):
+                if not flag_username:
+                    username = input('Enter your email address (or type "q" to EXIT):\n> ').strip()
+                    if username == "q":
+                        return False
+                    if not check_username_regex(username):
+                        print('[ERROR] Invalid email format. Please enter a valid email address.')
+                        continue
+                    if not self.server.check_username_exists(username):
+                        print("[ERROR] Email not found. Please try again.")
+                        continue
+                    flag_username = True
+                elif not flag_old_password:
+                    old_password = input('Enter your old password (or type "q" to EXIT, "b" to BACK):\n> ').strip()
+                    if old_password == "q":
+                        return False
+                    if old_password == "b":
+                        flag_username = False
+                        continue
+                    if not self.server.login_user(username, old_password):                
+                        print("[ERROR] Incorrect password. Please try again.")
+                        continue
+                    flag_old_password = True
+                elif not flag_new_password1:
+                    new_password1 = input('Enter a new password with at least 8 characters (or type "q" to EXIT, "b" to BACK):\n> ').strip()
+                    if new_password1 == "q":
+                        return False
+                    if new_password1 == "b":
+                        new_password1 = False
+                        continue
+                    if not check_password_regex(new_password1):
+                        print("[ERROR] Password must be at least 8 characters long!")
+                        continue
+                    flag_new_password1 = True
+                elif not flag_new_password2:
+                    new_password2 = input('Confirm your new password (or type "q" to EXIT, "b" to BACK):\n> ').strip()
+                    if new_password2 == "q":
+                        return False
+                    if new_password2 == "b":
+                        flag_new_password1 = False
+                        continue
+                    if new_password2 != new_password1:
+                        print("[ERROR] Passwords do not match! Please try again.")
+                        continue
+                    flag_new_password2 = True
+            self.server.reset_password(username, new_password1)
+            print(f"[STATUS] Password for '{username}' has been successfully reset.")
+            return True
+        finally:
+            self.server.close_conn()
