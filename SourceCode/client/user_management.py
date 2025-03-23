@@ -2,52 +2,52 @@ from SourceCode.server.server import Server
 from SourceCode.shared.utils import check_username_regex, check_password_regex
 
 class UserManagement:
-    server = Server()
-    def register_user_IO():
-        server.open_conn()
-        flag_username, flag_password1, flag_password2 = False, False, False
-        username, password1, password2 = None, None, None
-        while not (flag_username and flag_password1 and flag_password2):
-            if not flag_username:
-                username = input('Enter your email address (or type "q" for EXIT):\n> ').strip()
-                if username == "q":
-                    server.close_conn()
-                    return
-                if not check_username_regex(username):
-                    print('[ERROR] Invalid email format. Please enter a valid email address.')
-                    continue
-                if server.check_username_exists(username):
-                    print('[ERROR] Email already exists! Please choose a different one.')
-                    continue
-                flag_username = True
-            elif not flag_password1:
-                password1 = input('Enter a password with at least 8 characters (or type "q" for EXIT, "b" for BACK):\n> ').strip()
-                if password1 == "q":
-                    server.close_conn()
-                    return
-                if password1 == "b":
-                    flag_username = False
-                    continue
-                if not check_password_regex(password1):
-                    print("[ERROR] Password must be at least 8 characters long!")
-                    continue
-                flag_password1 = True
-            elif not flag_password2:
-                password2 = input('Confirm your password (or type "q" for EXIT, "b" for BACK):\n> ').strip()
-                if password2 == "q":
-                    server.close_conn()
-                    return
-                if password2 == "b":
-                    flag_password1 = False
-                    continue
-                if password2 != password1:
-                    print("[ERROR] Passwords do not match! Please try again.")
-                    continue
-                flag_password2 = True
-        client_aes = server.register_user(username, password1)
-        print(f"[STATUS] Email '{username}' registered successfully!")
-        server.close_conn()
-        return (client_aes)
+    def __init__(self):
+        self.server = Server()
+    def register_user_IO(self):
+        self.server.open_conn()
+        try:
+            flag_username, flag_password1, flag_password2 = False, False, False
+            username, password1, password2 = None, None, None
+            while not (flag_username and flag_password1 and flag_password2):
+                if not flag_username:
+                    username = input('Enter your email address (or type "q" for EXIT):\n> ').strip()
+                    if username == "q":
+                        return None
+                    if not check_username_regex(username):
+                        print('[ERROR] Invalid email format. Please enter a valid email address.')
+                        continue
+                    if self.server.check_username_exists(username):
+                        print('[ERROR] Email already exists! Please choose a different one.')
+                        continue
+                    flag_username = True
+                elif not flag_password1:
+                    password1 = input('Enter a password with at least 8 characters (or type "q" for EXIT, "b" for BACK):\n> ').strip()
+                    if password1 == "q":
+                        return None
+                    if password1 == "b":
+                        flag_username = False
+                        continue
+                    if not check_password_regex(password1):
+                        print("[ERROR] Password must be at least 8 characters long!")
+                        continue
+                    flag_password1 = True
+                elif not flag_password2:
+                    password2 = input('Confirm your password (or type "q" for EXIT, "b" for BACK):\n> ').strip()
+                    if password2 == "q":
+                        return None
+                    if password2 == "b":
+                        flag_password1 = False
+                        continue
+                    if password2 != password1:
+                        print("[ERROR] Passwords do not match! Please try again.")
+                        continue
+                    flag_password2 = True
+            client_aes = self.server.register_user(username, password1)
+            print(f"[STATUS] Email '{username}' registered successfully!")
+            return client_aes
+        finally:
+            self.server.close_conn()
 
     def login_user_IO():
         server.open_conn()
