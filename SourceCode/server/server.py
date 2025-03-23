@@ -1,18 +1,20 @@
 import sqlite3
+import sys
 import os
-from SourceCode.shared.utils import generate_aes, hash_password, split_aes
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
+from SourceCode.shared.utils import generate_aes, hash_password, init_database, split_aes
 
 class Server:
-    def __init__(self, db_filename="users.db"):
-        self.db_filename = db_filename
+    def __init__(self):
+        self.db_file_name = os.path.join(os.path.dirname(__file__), "data", "users.db")
         self.conn = None
         self.cursor = None
-        os.makedirs(os.path.dirname(self.db_filename), exist_ok=True)
-        # self.init_database()
+        os.makedirs(os.path.dirname(self.db_file_name), exist_ok=True)
+        init_database(self.db_file_name, "users")
 
     def open_conn(self):
         if self.conn is None:
-            self.conn = sqlite3.connect(self.db_filename)
+            self.conn = sqlite3.connect(self.db_file_name)
             self.cursor = self.conn.cursor()
 
     def close_conn(self):
@@ -64,4 +66,10 @@ class Server:
             self.conn.commit()
         finally:
             self.close_conn()
+    
+    def run(self):
+        print(f"[SERVER] Server started. Database initialized at {self.db_file_name}.")
 
+if __name__ == "__main__":
+    server = Server()
+    server.run()
