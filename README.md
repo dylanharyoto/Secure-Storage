@@ -10,3 +10,5 @@ init_database() is a function to initialize a .db file. The reason why it is in 
 When you boot up the server (run), the users.db will be created under /server/data, if not exist yet.
 
 Then, you can just interact with the client to register your username (email) and password.
+
+About hashing passwords, I am not sure if I should hash it in client or server. I asked gpt, it asked me to hash it in server. So the plain password is passed to the server, and hashed there. If this is not correct, we can change it. 
