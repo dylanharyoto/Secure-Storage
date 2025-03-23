@@ -4,12 +4,14 @@ from SourceCode.shared.utils import generate_aes, hash_password, split_aes
 
 class Server:
     def __init__(self, db_filename="users.db"):
-        self.db_filename = os.path.join(os.path.dirname(__file__), db_filename)
+        self.db_filename = db_filename
         self.conn = None
         self.cursor = None
+        os.makedirs(os.path.dirname(self.db_filename), exist_ok=True)
+        # self.init_database()
 
     def open_conn(self):
-        if self.conn is not None:
+        if self.conn is None:
             self.conn = sqlite3.connect(self.db_filename)
             self.cursor = self.conn.cursor()
 
@@ -21,6 +23,7 @@ class Server:
 
     def check_username_exists(self, username):
         self.open_conn()
+        print(self.cursor)
         try:
             self.cursor.execute("SELECT * FROM users WHERE username = ?", (username,))
             return self.cursor.fetchone() is not None
