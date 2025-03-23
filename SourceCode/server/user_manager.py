@@ -51,7 +51,7 @@ def register_user(database_file_name):
     hashed_password = hash_password(password1)
     aes_key = generate_aes()
     client_key, server_key = split_aes(aes_key)
-    cursor.execute("INSERT INTO users (username, password, key) VALUES (?, ?, ?)", (username, hashed_password, server_key))
+    cursor.execute("INSERT INTO users (username, password, key) VALUES (?, ?, ?)", (email, hashed_password, server_key))
     conn.commit()
     print(f"[STATUS] Email '{email}' registered successfully!")
     conn.close()
