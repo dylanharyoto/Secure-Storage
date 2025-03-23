@@ -1,9 +1,10 @@
 import sqlite3
+from SourceCode.server.server import init_conn
 from SourceCode.shared.utils import check_password, generate_aes, hash_password, split_aes, is_valid_email, is_valid_password
 
 def register_user(database_file_name):
-    conn = sqlite3.connect(database_file_name)
-    cursor = conn.cursor()
+    conn, cursor = init_conn(database_file_name)
+    print(conn, cursor)
     flag_email = False
     flag_password1 = False
     flag_password2 = False
