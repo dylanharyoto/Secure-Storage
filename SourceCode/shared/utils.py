@@ -10,7 +10,7 @@ def init_database(database_file_name):
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS users (
             username TEXT PRIMARY KEY,
-            password TEXT NOT NULL
+            password TEXT NOT NULL, 
             key TEXT NOT NULL
         )
     ''')
