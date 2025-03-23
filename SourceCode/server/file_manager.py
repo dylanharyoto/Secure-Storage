@@ -1,7 +1,4 @@
 import sqlite3
-import re
-import bcrypt
-
 import os
 
 

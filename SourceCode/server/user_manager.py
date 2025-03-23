@@ -45,7 +45,7 @@ def register_user(database_file_name):
             else:
                 flag_password2 = True
     hashed_password = hash_password(password1)
-    aes_key = generate_aes();
+    aes_key = generate_aes()
     client_key, server_key = split_aes(aes_key)
     cursor.execute("INSERT INTO users (username, password, key) VALUES (?, ?, ?)", (username, hashed_password, server_key))
     conn.commit()
