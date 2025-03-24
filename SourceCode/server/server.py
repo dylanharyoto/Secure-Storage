@@ -1,75 +1,88 @@
+from flask import Flask, request, jsonify, g
 import sqlite3
-import sys
 import os
+import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
-from SourceCode.shared.utils import generate_aes, hash_password, init_database, split_aes
+from SourceCode.shared.utils import generate_aes, hash_password, split_aes, init_database, check_password  # Import check_password
 
-class Server:
-    def __init__(self):
-        self.db_file_name = os.path.join(os.path.dirname(__file__), "data", "users.db")
-        self.conn = None
-        self.cursor = None
-        os.makedirs(os.path.dirname(self.db_file_name), exist_ok=True)
-        init_database(self.db_file_name, "users")
+# Initialize Flask app
+app = Flask(__name__)
+app.config['DATABASE'] = os.path.join(os.path.dirname(__file__), "data", "users.db")
 
-    def open_conn(self):
-        if self.conn is None:
-            self.conn = sqlite3.connect(self.db_file_name)
-            self.cursor = self.conn.cursor()
+# Initialize the database before the app starts
+db_file_name = app.config['DATABASE']
+os.makedirs(os.path.dirname(db_file_name), exist_ok=True)
+init_database(db_file_name, "users")
 
-    def close_conn(self):
-        if self.conn is not None:
-            self.conn.close()
-            self.conn = None
-            self.cursor = None
+def get_db():
+    """Get a database connection for the current request."""
+    if 'db' not in g:
+        g.db = sqlite3.connect(app.config['DATABASE'])
+    return g.db
 
-    def check_username_exists(self, username):
-        self.open_conn()
-        print(self.cursor)
-        try:
-            self.cursor.execute("SELECT * FROM users WHERE username = ?", (username,))
-            return self.cursor.fetchone() is not None
-        finally:
-            self.close_conn()
-        
-    def register_user(self, username, password):
-        self.open_conn()
-        try:
-            client_aes, server_aes = split_aes(generate_aes())
-            self.cursor.execute(
-                "INSERT INTO users (username, password, key) VALUES (?, ?, ?)", 
-                (username, hash_password(password), server_aes)
-            )
-            self.conn.commit()
-            return client_aes
-        finally:
-            self.close_conn()
+@app.teardown_appcontext
+def close_db(error):
+    """Close the database connection at the end of each request."""
+    if hasattr(g, 'db'):
+        g.db.close()
 
-    def login_user(self, username, password):
-        self.open_conn()
-        try:
-            self.cursor.execute("SELECT password FROM users WHERE username = ?", (username, ))
-            result = self.cursor.fetchone()
-            if result is None:
-                return False
-            return result[0] == hash_password(password)
-        finally:
-            self.close_conn()
+@app.route('/check_username', methods=['POST'])
+def check_username():
+    data = request.json
+    username = data.get('username')
+    db = get_db()
+    cursor = db.cursor()
+    cursor.execute("SELECT * FROM users WHERE username = ?", (username,))
+    exists = cursor.fetchone() is not None
+    if exists:
+        return jsonify({"message": "username exists"}), 201
+    return jsonify({"message": "username does not exist"}), 200
 
-    def reset_password(self, username, password):
-        self.open_conn()
-        try:
-            self.cursor.execute(
-                "UPDATE users SET password = ? WHERE username = ?",
-                (hash_password(password), username)
-            )
-            self.conn.commit()
-        finally:
-            self.close_conn()
-    
-    def run(self):
-        print(f"[SERVER] Server started. Database initialized at {self.db_file_name}.")
+@app.route('/register', methods=['POST'])
+def register():
+    data = request.json
+    username = data.get('username')
+    password = data.get('password')
+    db = get_db()
+    cursor = db.cursor()
+    aes_key = generate_aes()
+    server_aes, client_aes = split_aes(aes_key)
+    hashed_password = hash_password(password)
+    cursor.execute(
+        "INSERT INTO users (username, password, key) VALUES (?, ?, ?)",
+        (username, hashed_password, server_aes.hex())
+    )
+    db.commit()
+    return jsonify({"message": client_aes.hex()}), 200
+
+@app.route('/login', methods=['POST'])
+def login():
+    data = request.json
+    username = data.get('username')
+    password = data.get('password')
+    db = get_db()
+    cursor = db.cursor()
+    cursor.execute("SELECT password FROM users WHERE username = ?", (username,))
+    result = cursor.fetchone()
+    stored_hash = result[0]
+    if check_password(password, stored_hash):
+        return jsonify({"message": "password matches"}), 200
+    return jsonify({"message": "password does not match"}), 201
+
+@app.route('/reset_password', methods=['POST'])
+def reset_password():
+    data = request.json
+    username = data.get('username')
+    new_password = data.get('new_password')
+    db = get_db()
+    cursor = db.cursor()
+    new_hashed_password = hash_password(new_password)
+    cursor.execute(
+        "UPDATE users SET password = ? WHERE username = ?",
+        (new_hashed_password, username)
+    )
+    db.commit()
+    return jsonify({"message": "password reset"}), 200
 
 if __name__ == "__main__":
-    server = Server()
-    server.run()
+    app.run(host="0.0.0.0", port=5200, debug=True)
