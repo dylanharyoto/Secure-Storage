@@ -22,8 +22,6 @@ class UserManagement:
                         flag_username = True # next step
                     elif response.status_code == 201:
                         print('[ERROR] Email already exists.')
-                    elif response.status_code == 400:
-                        print('[ERROR] Email is required.')
                     else:
                         print("[ERROR] Server error.")
                 except requests.exceptions.RequestException as e:
@@ -50,20 +48,21 @@ class UserManagement:
                 if password2 != password1:
                     print("[ERROR] Passwords do not match.")
                     continue
-                flag_password2 = True
-        try:
-            response = requests.post(f"{self.server_url}/register", json={"username": username, "password": password1})
-            if response.status_code == 200:
-                response = response.json()
-                client_aes = bytes.fromhex(response["message"])  
-                print(f"[STATUS] Email '{username}' registered successfully.")
-                return client_aes
-            else:
-                print("[ERROR] Server error")
-                return None
-        except requests.exceptions.RequestException as e:
-            print(f"[ERROR] Network error: {e}")
-            return None
+                try:
+                    response = requests.post(f"{self.server_url}/register", json={"username": username, "password": password1})
+                    if response.status_code == 200:
+                        flag_password2 = True
+                        response = response.json()
+                        client_aes = bytes.fromhex(response["message"])  
+                        print(f"[STATUS] Email '{username}' registered successfully.")
+                        return client_aes
+                    else:
+                        print("[ERROR] Server error.")
+                        return False
+                except requests.exceptions.RequestException as e:
+                    print(f"[ERROR] Network error: {e}.")
+                    return False
+        return True
 
     def login_user_IO(self):
         flag_username, flag_password = False, False
@@ -74,7 +73,7 @@ class UserManagement:
                 if username == "q":
                     return False
                 if not check_username_regex(username):
-                    print('[ERROR] Invalid email format. Please enter a valid email address.')
+                    print('[ERROR] Invalid email format.')
                     continue
                 try:
                     response = requests.post(f"{self.server_url}/check_username", json={"username": username})
@@ -84,9 +83,10 @@ class UserManagement:
                         flag_username = True
                     else:
                         print("[ERROR] Server error.")
+                        return False
                 except requests.exceptions.RequestException as e:
                     print(f"[ERROR] Network error: {e}.")
-                    continue
+                    return False
             elif not flag_password:
                 password = input('Enter your password (or type "q" to EXIT, "b" to BACK):\n> ').strip()
                 if password == "q":
@@ -100,23 +100,16 @@ class UserManagement:
                 try:
                     response = requests.post(f"{self.server_url}/login", json={"username": username, "password": password})
                     if response.status_code == 200:
-                        data = response.json()
-                        if data["status"] == "success":
-                            print(f"[STATUS] Login successful! Welcome, {username}.")
-                            return True
-                        else:
-                            print(f"[ERROR] {data['message']}")
-                            continue
-                    elif response.status_code == 401:
-                        print("[ERROR] Incorrect password. Please try again.")
-                        continue
+                        flag_password = True
+                    elif response.status_code == 201:
+                        print("[ERROR] Incorrect password.")
                     else:
-                        print("[ERROR] Server error")
-                        continue
+                        print("[ERROR] Server error.")
+                        return False
                 except requests.exceptions.RequestException as e:
-                    print(f"[ERROR] Network error: {e}")
-                    continue
-        return False
+                    print(f"[ERROR] Network error: {e}.")
+                    return False
+        return True
 
     def reset_password_IO(self):
         flag_username, flag_old_password, flag_new_password1, flag_new_password2 = False, False, False, False
@@ -127,21 +120,20 @@ class UserManagement:
                 if username == "q":
                     return False
                 if not check_username_regex(username):
-                    print('[ERROR] Invalid email format. Please enter a valid email address.')
+                    print('[ERROR] Invalid email format.')
                     continue
                 try:
                     response = requests.post(f"{self.server_url}/check_username", json={"username": username})
                     if response.status_code == 200:
-                        if not response.json()["exists"]:
-                            print("[ERROR] Email not found. Please try again.")
-                            continue
+                        print("[ERROR] Email not found.")
+                    elif response.status_code == 201:
+                        flag_username = True
                     else:
                         print("[ERROR] Server error")
-                        continue
+                        return False
                 except requests.exceptions.RequestException as e:
                     print(f"[ERROR] Network error: {e}")
-                    continue
-                flag_username = True
+                    return False
             elif not flag_old_password:
                 old_password = input('Enter your old password (or type "q" to EXIT, "b" to BACK):\n> ').strip()
                 if old_password == "q":
@@ -152,18 +144,15 @@ class UserManagement:
                 try:
                     response = requests.post(f"{self.server_url}/login", json={"username": username, "password": old_password})
                     if response.status_code == 200:
-                        if response.json()["status"] != "success":
-                            print("[ERROR] Incorrect password. Please try again.")
-                            continue
-                    elif response.status_code == 401:
-                        print("[ERROR] Incorrect password. Please try again.")
+                        flag_old_password = True
+                    elif response.status_code == 201:
+                        print("[ERROR] Incorrect password.")
                     else:
                         print("[ERROR] Server error")
-                        continue
+                        return False
                 except requests.exceptions.RequestException as e:
-                    print(f"[ERROR] Network error: {e}")
-                    continue
-                flag_old_password = True
+                    print(f"[ERROR] Network error: {e}")     
+                    return False           
             elif not flag_new_password1:
                 new_password1 = input('Enter a new password with at least 8 characters (or type "q" to EXIT, "b" to BACK):\n> ').strip()
                 if new_password1 == "q":
@@ -172,7 +161,7 @@ class UserManagement:
                     flag_old_password = False
                     continue
                 if not check_password_regex(new_password1):
-                    print("[ERROR] Password must be at least 8 characters long!")
+                    print("[ERROR] Password must be at least 8 characters long.")
                     continue
                 flag_new_password1 = True
             elif not flag_new_password2:
@@ -183,26 +172,20 @@ class UserManagement:
                     flag_new_password1 = False
                     continue
                 if new_password2 != new_password1:
-                    print("[ERROR] Passwords do not match! Please try again.")
+                    print("[ERROR] Passwords do not match.")
                     continue
-                flag_new_password2 = True
-        try:
-            response = requests.post(f"{self.server_url}/reset_password", json={
-                "username": username,
-                "old_password": old_password,
-                "new_password": new_password1
-            })
-            if response.status_code == 200:
-                data = response.json()
-                if data["status"] == "success":
-                    print(f"[STATUS] Password for '{username}' has been successfully reset.")
-                    return True
-                else:
-                    print(f"[ERROR] {data['message']}")
+                try:
+                    response = requests.post(f"{self.server_url}/reset_password", json={
+                        "username": username,
+                        "new_password": new_password1
+                    })
+                    if response.status_code == 200:
+                        flag_new_password2 = True
+                        print(f"[STATUS] Password for '{username}' has been successfully reset.")
+                    else:
+                        print("[ERROR] Server error")
+                        return False
+                except requests.exceptions.RequestException as e:
+                    print(f"[ERROR] Network error: {e}")
                     return False
-            else:
-                print("[ERROR] Server error")
-                return False
-        except requests.exceptions.RequestException as e:
-            print(f"[ERROR] Network error: {e}")
-            return False
+        return True

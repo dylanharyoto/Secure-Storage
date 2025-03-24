@@ -2,7 +2,6 @@ import sys
 import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 from SourceCode.client.user_management import UserManagement
-from SourceCode.shared.utils import init_database
 
 class Client:
     def __init__(self):
