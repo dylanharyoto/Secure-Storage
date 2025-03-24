@@ -12,3 +12,7 @@ When you boot up the server (run), the users.db will be created under /server/da
 Then, you can just interact with the client to register your username (email) and password.
 
 About hashing passwords, I am not sure if I should hash it in client or server. I asked gpt, it asked me to hash it in server. So the plain password is passed to the server, and hashed there. If this is not correct, we can change it. 
+
+You need to install "requests" and "flask" by doing "pip3 install requests" and "pip3 install flask" respectively.
+
+Server port is currently running on 5200. Change it if you need.
