@@ -1,186 +1,121 @@
 import sqlite3
 import os
-
+import uuid
 
 class FileManager:
-    def __init__(self, base_directory="user_files", db_path="file_metadata.db"):
-        # Ensure the base directory for file storage exists.
-        self.base_directory = base_directory
-        os.makedirs(self.base_directory, exist_ok=True)
-
-        # Connect to the SQLite database (creates if it doesn't exist)
-        self.conn = sqlite3.connect(db_path, check_same_thread=False)
+    def __init__(self, files_db="files.db", users_db=None):
+        # Initialize the files database connection.
+        self.conn = sqlite3.connect(files_db, check_same_thread=False)
         self.cursor = self.conn.cursor()
-        self._create_tables()
+        self._create_files_tables()
+        
+        # Initialize the users database connection.
+        # If no users_db path is provided, use the default path.
+        if users_db is None:
+            users_db = os.path.join(os.path.dirname(__file__), "data", "users.db")
+        self.user_conn = sqlite3.connect(users_db, check_same_thread=False)
+        self.user_cursor = self.user_conn.cursor()
 
-    def _create_tables(self):
-        # Create table for file metadata.
-        self.cursor.execute('''
+    def _create_files_tables(self):
+        """Creates the tables for file metadata and sharing."""
+        self.cursor.execute("""
             CREATE TABLE IF NOT EXISTS files (
-                file_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                file_id TEXT PRIMARY KEY,
                 owner TEXT NOT NULL,
                 filename TEXT NOT NULL,
-                filepath TEXT NOT NULL
+                content BLOB NOT NULL
             )
-        ''')
-        # Create table for file sharing information.
-        self.cursor.execute('''
-            CREATE TABLE IF NOT EXISTS shared_files (
-                file_id INTEGER,
-                shared_user TEXT,
-                PRIMARY KEY (file_id, shared_user),
-                FOREIGN KEY (file_id) REFERENCES files (file_id)
+        """)
+        self.cursor.execute("""
+            CREATE TABLE IF NOT EXISTS shares (
+                file_id TEXT NOT NULL,
+                shared_with TEXT NOT NULL,
+                FOREIGN KEY(file_id) REFERENCES files(file_id)
             )
-        ''')
+        """)
         self.conn.commit()
-
-    def _sanitize_filename(self, filename):
-        """
-        Sanitize the file name to prevent path traversal attacks.
-        This removes any directory components.
-        """
-        return os.path.basename(filename)
 
     def add_file(self, username, filename, content):
-        """
-        Allows a user to add/upload a file.
-        The file is stored under a subdirectory named after the user.
-        """
-        safe_filename = self._sanitize_filename(filename)
-
-        # Create a dedicated directory for the user if it doesn't exist.
-        user_dir = os.path.join(self.base_directory, username)
-        os.makedirs(user_dir, exist_ok=True)
-
-        # Insert metadata first. The file_id is auto-generated.
-        self.cursor.execute('''
-            INSERT INTO files (owner, filename, filepath) 
-            VALUES (?, ?, ?)
-        ''', (username, safe_filename, ""))
-        file_id = self.cursor.lastrowid
-
-        # Create a unique file name using file_id.
-        file_path = os.path.join(user_dir, f"{file_id}_{safe_filename}")
-
-        # Save the file content.
-        with open(file_path, "wb") as f:
-            f.write(content)
-
-        # Update the file record with the correct file_path.
-        self.cursor.execute('''
-            UPDATE files SET filepath = ? WHERE file_id = ?
-        ''', (file_path, file_id))
+        """Add a new file to the files database."""
+        file_id = str(uuid.uuid4())
+        self.cursor.execute(
+            "INSERT INTO files (file_id, owner, filename, content) VALUES (?, ?, ?, ?)",
+            (file_id, username, filename, content)
+        )
         self.conn.commit()
-
         return file_id
 
     def edit_file(self, username, file_id, new_content):
-        """
-        Allows a user to edit an existing file.
-        Only the file owner is permitted to update its content.
-        """
-        self.cursor.execute('''
-            SELECT owner, filepath FROM files WHERE file_id = ?
-        ''', (file_id,))
+        """Edit an existing file if the user is the owner."""
+        self.cursor.execute("SELECT owner FROM files WHERE file_id = ?", (file_id,))
         result = self.cursor.fetchone()
-        if not result:
-            raise ValueError("File not found")
-        owner, file_path = result
-        if owner != username:
-            raise PermissionError("You do not have permission to edit this file")
-
-        # Overwrite the file content.
-        with open(file_path, "wb") as f:
-            f.write(new_content)
-        return True
+        if result and result[0] == username:
+            self.cursor.execute("UPDATE files SET content = ? WHERE file_id = ?", (new_content, file_id))
+            self.conn.commit()
+        else:
+            raise PermissionError("You do not have permission to edit this file.")
 
     def delete_file(self, username, file_id):
-        """
-        Allows a user to delete a file.
-        Only the file owner is allowed to delete it.
-        """
-        self.cursor.execute('''
-            SELECT owner, filepath FROM files WHERE file_id = ?
-        ''', (file_id,))
+        """Delete a file if the user is the owner."""
+        self.cursor.execute("SELECT owner FROM files WHERE file_id = ?", (file_id,))
         result = self.cursor.fetchone()
-        if not result:
-            raise ValueError("File not found")
-        owner, file_path = result
-        if owner != username:
-            raise PermissionError("You do not have permission to delete this file")
+        if result and result[0] == username:
+            self.cursor.execute("DELETE FROM files WHERE file_id = ?", (file_id,))
+            self.cursor.execute("DELETE FROM shares WHERE file_id = ?", (file_id,))
+            self.conn.commit()
+        else:
+            raise PermissionError("You do not have permission to delete this file.")
 
-        # Delete the file from disk.
-        if os.path.exists(file_path):
-            os.remove(file_path)
-
-        # Delete the file metadata and sharing records.
-        self.cursor.execute('''
-            DELETE FROM files WHERE file_id = ?
-        ''', (file_id,))
-        self.cursor.execute('''
-            DELETE FROM shared_files WHERE file_id = ?
-        ''', (file_id,))
-        self.conn.commit()
-        return True
-
-    def share_file(self, username, file_id, designated_users):
+    def share_file(self, username, file_id, users):
         """
-        Allows the owner of a file to share it with designated users.
-        The designated users will be able to read the file via their client.
+        Share a file with designated users.
+        The file owner must be the one sharing the file.
         """
-        # Verify that the file exists and that the requester is the owner.
-        self.cursor.execute('''
-            SELECT owner FROM files WHERE file_id = ?
-        ''', (file_id,))
+        self.cursor.execute("SELECT owner FROM files WHERE file_id = ?", (file_id,))
         result = self.cursor.fetchone()
-        if not result:
-            raise ValueError("File not found")
-        owner = result[0]
-        if owner != username:
-            raise PermissionError("You do not have permission to share this file")
-
-        # Insert each designated user into the shared_files table.
-        for user in designated_users:
-            try:
-                self.cursor.execute('''
-                    INSERT INTO shared_files (file_id, shared_user)
-                    VALUES (?, ?)
-                ''', (file_id, user))
-            except sqlite3.IntegrityError:
-                # This means the sharing record already exists, so we can skip it.
-                continue
-        self.conn.commit()
-        return True
+        if result and result[0] == username:
+            for user in users:
+                self.cursor.execute("INSERT INTO shares (file_id, shared_with) VALUES (?, ?)", (file_id, user))
+            self.conn.commit()
+        else:
+            raise PermissionError("You do not have permission to share this file.")
 
     def get_file(self, username, file_id):
         """
-        Returns the content of a file if the requesting user is either the owner
-        or has been granted access via sharing.
+        Retrieve the file's content and the AES key.
+        - If the requester is the owner, the owner's AES key is retrieved.
+        - If the requester is a shared user, the owner's AES key is retrieved.
         """
-        self.cursor.execute('''
-            SELECT owner, filepath FROM files WHERE file_id = ?
-        ''', (file_id,))
+        # Query the file record.
+        self.cursor.execute("SELECT owner, content FROM files WHERE file_id = ?", (file_id,))
         result = self.cursor.fetchone()
         if not result:
             raise ValueError("File not found")
-        owner, file_path = result
+        owner, content = result
 
-        # Check if the user is the owner.
-        if owner == username:
-            pass
-        else:
-            # Check if the user is in the shared_files table.
-            self.cursor.execute('''
-                SELECT 1 FROM shared_files WHERE file_id = ? AND shared_user = ?
-            ''', (file_id, username))
+        # Check access permission.
+        if owner != username:
+            self.cursor.execute(
+                "SELECT 1 FROM shares WHERE file_id = ? AND shared_with = ?",
+                (file_id, username)
+            )
             if not self.cursor.fetchone():
-                raise PermissionError("You do not have permission to access this file")
+                raise PermissionError("You do not have permission to access this file.")
 
-        # Read and return the file content.
-        with open(file_path, "rb") as f:
-            content = f.read()
-        return content
-    
+        # Retrieve the AES key from the users table.
+        # For both owner and shared users, the AES key of the file owner is returned.
+        self.user_cursor.execute("SELECT key FROM users WHERE username = ?", (owner,))
+        user_record = self.user_cursor.fetchone()
+        if not user_record:
+            raise ValueError("User record not found for owner")
+        aes_key = user_record[0]
+        return content, aes_key
+
+    def get_user(self):
+        """Return a list of all usernames from the users table."""
+        self.user_cursor.execute("SELECT username FROM users")
+        users = [row[0] for row in self.user_cursor.fetchall()]
+        return users
  
 
     def view_files(self, username):

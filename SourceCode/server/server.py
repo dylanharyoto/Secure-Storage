@@ -141,27 +141,19 @@ def share():
     except Exception as e:
         return jsonify({"error": str(e)}), 403
 
-# Endpoint: Get a file's content
+# Endpoint: Get a file's content and AES key
 @app.route('/get', methods=['POST'])
 def get_file():
     username = request.json.get('username')
     file_id = request.json.get('file_id')
     try:
-        content = file_manager.get_file(username, file_id)
-        return jsonify({"content": content.decode()})
+        # get_file now returns both file content and AES key.
+        content, aes_key = file_manager.get_file(username, file_id)
+        # Assuming the file content is text, decode it before returning.
+        return jsonify({"content": content.decode(), "aes_key": aes_key})
     except Exception as e:
         return jsonify({"error": str(e)}), 403
-    
 
-# Endpoint: Get a file's content
-@app.route('/list', methods=['POST'])
-def list_files():
-    username = request.json.get('username')
-    try:
-        content = file_manager.get_file(username)
-        return jsonify({"content": content})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 403
     
 
 
