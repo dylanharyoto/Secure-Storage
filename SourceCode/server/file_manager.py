@@ -181,21 +181,21 @@ class FileManager:
             content = f.read()
         return content
     
-    def list_file(self, username):
+ 
+
+    def view_files(self, username):
         """
-        Returns the list of stored files for a given user.
+        Retrieve all file names and IDs that are either owned by the user or shared with the user.
+        Returns a dictionary in the format: {file_id: filename}
         """
-        self.cursor.execute('''SELECT file_id, filename FROM files WHERE owner = ?
-                                UNION SELECT f.file_id, f.filename FROM shared_files sf 
-                                JOIN files f ON sf.file_id = f.file_id
-                                WHERE sf.shared_user = ?;''', (username, username))
-
-        results = self.cursor.fetchall()
-
-        content = "\n".join([("File id " + str(file[0]) + ": " + file[1]) for file in results])
-
+        self.cursor.execute("""
+            SELECT file_id, filename FROM files 
+            WHERE owner = ? OR file_id IN (
+                SELECT file_id FROM shares WHERE shared_with = ?
+            )
+        """, (username, username))
+        content = "\n".join([("File id " + str(file[0]) + ": " + file[1]) for file in self.cursor.fetchall()])
         return content
-
 
     def close(self):
         """Close the database connection."""

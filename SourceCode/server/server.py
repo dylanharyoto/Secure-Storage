@@ -85,6 +85,16 @@ def reset_password():
     db.commit()
     return jsonify({"message": "password reset"}), 200
 
+# Endpoint: View all files of a user
+@app.route('/view_files', methods=['POST'])
+def view_files():
+    username = request.json.get('username')
+    try:
+        files = file_manager.view_files(username)
+        return jsonify({"files": files})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 403
+
 # Endpoint: Upload a file
 @app.route('/upload', methods=['POST'])
 def upload():
