@@ -6,6 +6,7 @@ from SourceCode.client.user_management import UserManagement
 class Client:
     def __init__(self):
         self.user_management = UserManagement()
+        self.run()
 
     def run(self):
         while True:
@@ -23,6 +24,7 @@ class Client:
                 status = self.user_management.login_user_IO()
                 if status:
                     print("[INFO] Login successful.")
+                    self.session()
             elif choice == "3":
                 status = self.user_management.reset_password_IO()
                 if status:
@@ -32,6 +34,21 @@ class Client:
                 break
             else:
                 print("Invalid choice. Please try again.")
+    
+    
+    def session(self):
+        pass
+    """
+        while True:
+            print("\nHome Page:")
+            print("1. View Storage")
+            print("2. Upload File")
+            print("3. Download File")
+            print("4. Peek File")
+            print("5. Edit File")
+            choice = input("Enter your choice:\n> ").strip()
+            if choice == "1":
+    """
 
 if __name__ == "__main__":
     client = Client()

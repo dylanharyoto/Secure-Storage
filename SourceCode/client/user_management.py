@@ -1,5 +1,5 @@
 import requests
-from SourceCode.shared.utils import check_username_regex, check_password_regex, hash_password
+from SourceCode.shared.utils import check_username_regex, check_password_regex, generate_aes, hash_password, split_aes
 
 class UserManagement:
     def __init__(self):
@@ -49,11 +49,14 @@ class UserManagement:
                     print("[ERROR] Passwords do not match.")
                     continue
                 try:
-                    response = requests.post(f"{self.server_url}/register", json={"username": username, "password": password1})
+
+                    aes_key = generate_aes()
+                    server_aes, client_aes = split_aes(aes_key)
+                    response = requests.post(f"{self.server_url}/register", json={"username": username, "password": password1, "key": server_aes.hex()})
                     if response.status_code == 200:
                         flag_password2 = True
                         response = response.json()
-                        client_aes = bytes.fromhex(response["message"])  
+                        client_aes = bytes.fromhex(client_aes.hex())  
                         print(f"[STATUS] Email '{username}' registered successfully.")
                         return client_aes
                     else:

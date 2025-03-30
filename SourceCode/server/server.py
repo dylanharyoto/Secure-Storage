@@ -43,17 +43,16 @@ def register():
     data = request.json
     username = data.get('username')
     password = data.get('password')
+    server_aes = data.get('key')
     db = get_db()
     cursor = db.cursor()
-    aes_key = generate_aes()
-    server_aes, client_aes = split_aes(aes_key)
     hashed_password = hash_password(password)
     cursor.execute(
         "INSERT INTO users (username, password, key) VALUES (?, ?, ?)",
-        (username, hashed_password, server_aes.hex())
+        (username, hashed_password, server_aes)
     )
     db.commit()
-    return jsonify({"message": client_aes.hex()}), 200
+    return jsonify({"message": "Registered Successfully"}), 200
 
 @app.route('/login', methods=['POST'])
 def login():
