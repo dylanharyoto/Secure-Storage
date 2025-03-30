@@ -4,10 +4,12 @@ import os
 import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 from SourceCode.shared.utils import generate_aes, hash_password, split_aes, init_database, check_password  # Import check_password
+from file_manager import FileManager
 
 # Initialize Flask app
 app = Flask(__name__)
 app.config['DATABASE'] = os.path.join(os.path.dirname(__file__), "data", "users.db")
+file_manager = FileManager()
 
 # Initialize the database before the app starts
 db_file_name = app.config['DATABASE']
@@ -82,6 +84,76 @@ def reset_password():
     )
     db.commit()
     return jsonify({"message": "password reset"}), 200
+
+# Endpoint: Upload a file
+@app.route('/upload', methods=['POST'])
+def upload():
+    username = request.form.get('username')
+    file = request.files.get('file')
+    if not username or not file:
+        return jsonify({"error": "Missing username or file"}), 400
+
+    file_id = file_manager.add_file(username, file.filename, file.read())
+    return jsonify({"file_id": file_id})
+
+# Endpoint: Edit a file
+@app.route('/edit', methods=['POST'])
+def edit():
+    username = request.json.get('username')
+    file_id = request.json.get('file_id')
+    new_content = request.json.get('content')
+    try:
+        file_manager.edit_file(username, file_id, new_content.encode())
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 403
+
+# Endpoint: Delete a file
+@app.route('/delete', methods=['POST'])
+def delete():
+    username = request.json.get('username')
+    file_id = request.json.get('file_id')
+    try:
+        file_manager.delete_file(username, file_id)
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 403
+
+# Endpoint: Share a file
+@app.route('/share', methods=['POST'])
+def share():
+    username = request.json.get('username')
+    file_id = request.json.get('file_id')
+    designated_users = request.json.get('users')
+    try:
+        file_manager.share_file(username, file_id, designated_users)
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 403
+
+# Endpoint: Get a file's content
+@app.route('/get', methods=['POST'])
+def get_file():
+    username = request.json.get('username')
+    file_id = request.json.get('file_id')
+    try:
+        content = file_manager.get_file(username, file_id)
+        return jsonify({"content": content.decode()})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 403
+    
+
+# Endpoint: Get a file's content
+@app.route('/list', methods=['POST'])
+def list_files():
+    username = request.json.get('username')
+    try:
+        content = file_manager.get_file(username)
+        return jsonify({"content": content})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 403
+    
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5200, debug=True)

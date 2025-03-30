@@ -180,6 +180,22 @@ class FileManager:
         with open(file_path, "rb") as f:
             content = f.read()
         return content
+    
+    def list_file(self, username):
+        """
+        Returns the list of stored files for a given user.
+        """
+        self.cursor.execute('''SELECT file_id, filename FROM files WHERE owner = ?
+                                UNION SELECT f.file_id, f.filename FROM shared_files sf 
+                                JOIN files f ON sf.file_id = f.file_id
+                                WHERE sf.shared_user = ?;''', (username, username))
+
+        results = self.cursor.fetchall()
+
+        content = "\n".join([("File id " + str(file[0]) + ": " + file[1]) for file in results])
+
+        return content
+
 
     def close(self):
         """Close the database connection."""
