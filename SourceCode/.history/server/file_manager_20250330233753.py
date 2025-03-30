@@ -138,32 +138,31 @@ if __name__ == "__main__":
     # Display all registered users.
     print("Registered users:", fm.get_user())
 
-    # Simulate Alice uploading a file 
+    # --- Simulate Alice uploading a file ---
     try:
         file_id = fm.add_file("alice", "secret.txt", b"This is Alice's secret file content.")
         print("Alice uploaded a file. File ID:", file_id)
     except Exception as e:
         print("Error uploading file for Alice:", e)
 
-    # Alice shares the file with Bob
+    # --- Alice shares the file with Bob ---
     try:
         fm.share_file("alice", file_id, ["bob"])
         print("Alice shared the file with Bob.")
     except Exception as e:
         print("Error sharing file:", e)
 
-    # Bob views his accessible files (both his and shared with him) 
+    # --- Bob views his accessible files (both his and shared with him) ---
     try:
         bob_files = fm.view_files("bob")
         print("Files accessible by Bob:", bob_files)
     except Exception as e:
         print("Error retrieving Bob's files:", e)
 
-    # Bob retrieves the shared file content along with the AES key 
+    # --- Bob retrieves the shared file content along with the AES key ---
     try:
         content, aes_key = fm.get_file("bob", file_id)
         print("Bob retrieved file content:", content.decode())
         print("AES key for the file (from owner's record):", aes_key)
     except Exception as e:
-        # This might happen if Amy is not a real user. Please replace the usernames with registered user names and retry.
         print("Error retrieving file for Bob:", e)
