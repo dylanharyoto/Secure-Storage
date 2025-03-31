@@ -42,13 +42,25 @@ class Client:
             print("1. View Storage")
             print("2. Upload File")
             print("3. Download File")
-            print("4. Peek File")
-            print("5. Edit File")
+            print("4. Edit File")
+            print("5. Share File")
+            print("6. Log Out")
             choice = input("Enter your choice:\n> ").strip()
             if choice == "1":
                 self.user_management.user_read_storage(username)
             elif choice == "2":
-                self.user_management
+                self.user_management.upload_file(username)
+            elif choice == "3":
+                self.user_management.download_file(username)
+            elif choice == "4":
+                self.user_management.edit_file(username)
+            elif choice == "5":
+                self.user_management.share_users(username)
+            elif choice == "6":
+                print("User Logging Out...")
+                break
+            else:
+                print("Invalid choice. Please try again.")
     
 
 if __name__ == "__main__":

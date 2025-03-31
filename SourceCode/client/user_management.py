@@ -195,21 +195,7 @@ class UserManagement:
                     return False
         return True
     
-    def user_read_storage(self, username):
-        """
-        Fetch all file names in the storages that this client can read.
-        """
-        try:
-            response = requests.post(f"{self.server_url}/view_files", json={"username": username})
-
-            #Print out existing files with id
-            if response.status_code == 200:
-                print(response.json()["files"])
-            else:
-                print("[ERROR] Server error.")
-        except requests.exceptions.RequestException as e:
-            print(f"[ERROR] Network error: {e}.")
-        return
+    
     
     def upload_file(self, username):
         """
@@ -240,50 +226,23 @@ class UserManagement:
                 return None
         print("[ERROR] Invalid file path or file does not exist.")
 
-    def download_file(self, username):
-        """
-        Download an existing file from the server to a specific directory.
-        """
-        # Query user for the target file id
-        input_flag = False
-        while not input_flag:
-            try:
-                choice = input("Please input the file ID for the file to be downloaded (or type \"q\" to EXIT):\n> ")
-                if choice == 'q':
-                    return None
-                file_id = int(choice)
-
-                # Request for the file content from server
-                data = {'username': username, 'file_id': file_id}
-                response = requests.post(f"{self.server_url}/get", json=data)
-                if response.status_code == 403:
-                        print(f"[ERROR] {response.json()["error"]}")
-                        return None
-                return response.json()
-            
-            except ValueError:
-                print("[ERROR] Please input an valid integer")
-            except requests.exceptions.RequestException as e:
-                print(f"[ERROR] Network error: {e}.")
-                return None
-            
     def edit_file(self, username):
         """
         Update the target file by sending new content to server
         """
-        # input flag tests if user has already input a target file, and path flag tests if user finish process
+        # file flag tests if user has already input a target file, and path flag tests if user finish process
         path_flag = False
-        input_flag = False
+        file_flag = False
         file_id = 0
         while not path_flag:
             try:
                 # Query user for the file id of file to be edited
-                if not input_flag:
+                if not file_flag:
                     choice = input("Please input the file ID for the file to be edited (or type \"q\" to EXIT):\n> ")
                     if choice == 'q':
                         return None
                     file_id = int(choice)
-                input_flag = True
+                file_flag = True
 
                 # Query user for local file to replace
                 choice = input("Please input the path of the file to be edited  (or type \"q\" to EXIT, \"b\" to BACK):\n> :\n> ")
@@ -291,7 +250,7 @@ class UserManagement:
                     return None
                 # Re-enter target file
                 if choice == "b":
-                    input_flag = False
+                    file_flag = False
                     continue
                 file_path = choice
                 if os.path.isfile(file_path):
@@ -314,17 +273,153 @@ class UserManagement:
                 print("[ERROR] Invalid file path or file does not exist.")
             
             except ValueError:
-                print("[ERROR] Please input an valid integer")
+                print("[ERROR] Please input a valid integer")
             except requests.exceptions.RequestException as e:
                 print(f"[ERROR] Network error: {e}.")
                 return None
 
+    def delete_file(self, username):
+        """
+        Delete the target file from server storage
+        """
+        try:
+            # Query user for the file id of file to be deleted
+            choice = input("Please input the file ID for the file to be edited (or type \"q\" to EXIT):\n> ")
+            if choice == 'q':
+                return None
+            file_id = int(choice)
+            data = {'username': username, 'file_id': file_id}
+            response = requests.post(f"{self.server_url}/delete", json=data)
+
+            ####ERROR
+
+            return response.json()
+            
+        except ValueError:
+            print("[ERROR] Please input a valid integer")
+            return None
+        except requests.exceptions.RequestException as e:
+            print(f"[ERROR] Network error: {e}.")
+            return None
+    
     def share_users(self, username):
-        pass
+        """
+        Fetch all users available and allow current user to choose those to share with
+        Then send information to server
+        """
+        # file flag tests if user has already input a target file, and user flag tests if user finish process
+        user_flag = False
+        file_flag = False
+        file_id = 0
+        user_names = []
+
+        # Fetch all existing users from server
+        try:
+            response = requests.post(f"{self.server_url}/get_users")
+            message = response.json()["message"]
+
+            ####ERROR
+
+            all_users = message.split(',').sort()
+        except requests.exceptions.RequestException as e:
+            print(f"[ERROR] Network error: {e}.")
+            return None
         
+        while not user_flag:
+            # Query user for the file id of file to be shared
+            if not file_flag:
+                choice = input("Please input the file ID for the file to be shared (or type \"q\" to EXIT):\n> ")
+                if choice == 'q':
+                    return None
+                try:
+                    file_id = int(choice)
+                except ValueError:
+                    print("[ERROR] Please input a valid integer")
+                    continue
+            file_flag = True
 
+            # list all users available to share
+            print("Other current users available are listed below:")
+            [print(f"{i+1}: {all_users[i]}") for i in range(len(all_users)) if username != all_users[i]]
+            if len(user_names)==0:
+                print(f"Added users are: None")
+            else:
+                print(f"Added users are: {','.join(user_names)}")
 
+            # Query user to choose a user to share
+            choice = input("Please input one correspond index of target user to share with,\ntype \"p\" to proceed (or type \"q\" to EXIT, \"b\" to BACK):\n> ")
+            if choice == "q":
+                return None
+            # Re-enter target file
+            if choice == "b":
+                if user_names:
+                    all_users.append(user_names.pop())
+                    all_users = all_users.sort()
+                else:
+                    file_flag = False
+                continue
+            # proceed to send all selected users to server
+            if choice == "p":
+                try:
+                    data = {'username': username, 'file_id': file_id, 'users': user_names}
+                    response = requests.post(f"{self.server_url}/share", json=data)
 
+                    ####ERROR
+                    
+                    return response.json()
+                except requests.exceptions.RequestException as e:
+                    print(f"[ERROR] Network error: {e}.")
+                    return None
+            try:
+                user_names.append(all_users[int(choice)])
+            except ValueError:
+                print("[ERROR] Please input a valid integer")
+                continue
+            except IndexError:
+                print("[ERROR] Please input a valid user index")
+                continue
+    def download_file(self, username):
+        """
+        Download an existing file from the server to a specific directory.
+        """
+        # Query user for the target file id
+        input_flag = False
+        while not input_flag:
+            try:
+                choice = input("Please input the file ID for the file to be downloaded (or type \"q\" to EXIT):\n> ")
+                if choice == 'q':
+                    return None
+                file_id = int(choice)
+
+                # Request for the file content from server
+                data = {'username': username, 'file_id': file_id}
+                response = requests.post(f"{self.server_url}/get", json=data)
+                if response.status_code == 403:
+                        print(f"[ERROR] {response.json()["error"]}")
+                        return None
+                return response.json()
+            
+            except ValueError:
+                print("[ERROR] Please input a valid integer")
+            except requests.exceptions.RequestException as e:
+                print(f"[ERROR] Network error: {e}.")
+                return None
+        
+    def user_read_storage(self, username):
+        """
+        Fetch all file names in the storages that this client can read.
+        """
+        try:
+            response = requests.post(f"{self.server_url}/view_files", json={"username": username})
+
+            #Print out existing files with id
+            if response.status_code == 200:
+                print(response.json()["message"])
+            else:
+                print("[ERROR] Server error.")
+        except requests.exceptions.RequestException as e:
+            print(f"[ERROR] Network error: {e}.")
+    
     
     '''
 Request Examples of File Manager
