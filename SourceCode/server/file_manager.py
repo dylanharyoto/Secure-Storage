@@ -126,7 +126,7 @@ class FileManager:
         self.cursor.execute("""
             SELECT file_id, filename FROM files 
             WHERE owner = ? OR file_id IN (
-                SELECT file_id FROM shares WHERE shared_with = ?
+                SELECT file_id FROM shared_files WHERE shared_user = ?
             )
         """, (username, username))
         content = "\n".join([("File id " + str(file[0]) + ": " + file[1]) for file in self.cursor.fetchall()])

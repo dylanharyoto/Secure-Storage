@@ -74,7 +74,7 @@ class UserManagement:
             if not flag_username:
                 username = input('Enter your email address (or type "q" to EXIT):\n> ').strip()
                 if username == "q":
-                    return False
+                    return False, None
                 if not check_username_regex(username):
                     print('[ERROR] Invalid email format.')
                     continue
@@ -86,16 +86,16 @@ class UserManagement:
                         flag_username = True
                     else:
                         print("[ERROR] Server error.")
-                        return False
+                        return False, None
                 except requests.exceptions.RequestException as e:
                     print(f"[ERROR] Network error: {e}.")
-                    return False
+                    return False, None
             elif not flag_password:
                 password = input('Enter your password (or type "q" to EXIT, "b" to BACK):\n> ').strip()
                 if password == "q":
-                    return False
+                    return False, None
                 if password == "b":
-                    flag_username = False
+                    flag_username = False, None
                     break
                 if not check_password_regex(password):
                     print("[ERROR] Password must be at least 8 characters long!")
@@ -108,11 +108,11 @@ class UserManagement:
                         print("[ERROR] Incorrect password.")
                     else:
                         print("[ERROR] Server error.")
-                        return False
+                        return False, None
                 except requests.exceptions.RequestException as e:
                     print(f"[ERROR] Network error: {e}.")
-                    return False
-        return True
+                    return False, None
+        return True, username
 
     def reset_password_IO(self):
         flag_username, flag_old_password, flag_new_password1, flag_new_password2 = False, False, False, False
@@ -192,3 +192,17 @@ class UserManagement:
                     print(f"[ERROR] Network error: {e}")
                     return False
         return True
+    
+    def user_read_storage(self, username):
+        """
+        Fetch all file names in the storages that this client can read.
+        """
+        try:
+            response = requests.post(f"{self.server_url}/view_files", json={"username": username})
+            if response.status_code == 200:
+                print(response.json()["files"])
+            else:
+                print("[ERROR] Server error.")
+        except requests.exceptions.RequestException as e:
+            print(f"[ERROR] Network error: {e}.")
+        return

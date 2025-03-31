@@ -22,9 +22,9 @@ class Client:
                     print(f"[INFO] Client AES key generated: {client_aes}")
             elif choice == "2":
                 status = self.user_management.login_user_IO()
-                if status:
+                if status[0]:
                     print("[INFO] Login successful.")
-                    self.session()
+                    self.session(status[1])
             elif choice == "3":
                 status = self.user_management.reset_password_IO()
                 if status:
@@ -36,9 +36,7 @@ class Client:
                 print("Invalid choice. Please try again.")
     
     
-    def session(self):
-        pass
-    """
+    def session(self, username):
         while True:
             print("\nHome Page:")
             print("1. View Storage")
@@ -48,7 +46,9 @@ class Client:
             print("5. Edit File")
             choice = input("Enter your choice:\n> ").strip()
             if choice == "1":
-    """
+                self.user_management.user_read_storage(username)
+            elif choice == "2":
+                pass
     '''
 Request Examples of File Manager
 
