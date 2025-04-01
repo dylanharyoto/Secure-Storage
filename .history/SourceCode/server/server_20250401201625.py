@@ -95,7 +95,7 @@ def upload():
         return jsonify({"error": "Missing username or file"}), 400
 
     file_id = file_manager.add_file(username, file.filename, file.read())
-    return jsonify({"file_id": file_id})
+    return jsonify({"file_id": file_id, "access": "owned"})
 
 # Endpoint: Edit a file (only if owned by the requester)
 @app.route('/edit', methods=['POST'])
@@ -191,4 +191,4 @@ def require_rsa():
     return jsonify({"rsa": user_rsa})
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    app.run(host="0.0.0.0", port=5200, debug=True)

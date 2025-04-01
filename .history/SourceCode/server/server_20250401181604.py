@@ -3,7 +3,7 @@ import sqlite3
 import os
 import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
-from SourceCode.shared.utils import hash_password, init_database, check_password  # Import check_password
+from SourceCode.shared.utils import generate_aes, hash_password, split_aes, init_database, check_password  # Import check_password
 from file_manager import FileManager
 
 # Initialize Flask app
@@ -86,7 +86,7 @@ def reset_password():
     db.commit()
     return jsonify({"message": "password reset"}), 200
 
-# Endpoint: Upload a file (owned)
+# Endpoint: Upload a file
 @app.route('/upload', methods=['POST'])
 def upload():
     username = request.form.get('username')
@@ -97,81 +97,7 @@ def upload():
     file_id = file_manager.add_file(username, file.filename, file.read())
     return jsonify({"file_id": file_id})
 
-# Endpoint: Edit a file (only if owned by the requester)
-@app.route('/edit', methods=['POST'])
-def edit():
-    username = request.json.get('username')
-    file_id = request.json.get('file_id')
-    new_content = request.json.get('content')
-    try:
-        file_manager.edit_file(username, file_id, new_content.encode())
-        return jsonify({"success": True})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 403
-
-# Endpoint: Delete a file (only if owned by the requester)
-@app.route('/delete', methods=['POST'])
-def delete():
-    username = request.json.get('username')
-    file_id = request.json.get('file_id')
-    try:
-        file_manager.delete_file(username, file_id)
-        return jsonify({"success": True})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 403
-
-# Endpoint: Share a file
-@app.route('/share', methods=['POST'])
-def share():
-    """
-    Expected JSON payload:
-    {
-        "username": "alice",
-        "file_id": "original_file_id",
-        "share_info": {
-            "bob": "Bob's shared file content (base64 or text)",
-            "carol": "Carol's shared file content"
-        }
-    }
-    """
-    username = request.json.get('username')
-    file_id = request.json.get('file_id')
-    share_info = request.json.get('share_info')
-    if not username or not file_id or not share_info:
-        return jsonify({"error": "Missing username, file_id, or share_info"}), 400
-    try:
-        new_ids = file_manager.share_file(username, file_id, share_info)
-        return jsonify({"shared_file_ids": new_ids})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 403
-
-# Endpoint: View all files for a user
-@app.route('/view_files', methods=['POST'])
-def view_files():
-    username = request.json.get('username')
-    if not username:
-        return jsonify({"error": "Missing username"}), 400
-    try:
-        files = file_manager.view_files(username)
-        return jsonify({"files": files})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 403
-
-# Updated Endpoint: Get a file's content and access attribute
-@app.route('/get', methods=['POST'])
-def get_file():
-    username = request.json.get('username')
-    file_id = request.json.get('file_id')
-    if not username or not file_id:
-        return jsonify({"error": "Missing username or file_id"}), 400
-    try:
-        content, access = file_manager.get_file(username, file_id)
-        # Assuming text content; adjust if binary data (e.g., use base64 encoding)
-        return jsonify({"content": content.decode(), "access": access})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 403
-
-
+<<<<<<< HEAD
 # Endpoint: Require AES key
 @app.route('/require_aes', methods=['POST'])
 def require_aes():
@@ -190,5 +116,87 @@ def require_rsa():
         return jsonify({"error": f"RSA key for {username} not found"}), 400
     return jsonify({"rsa": user_rsa})
 
+=======
+>>>>>>> 23824c8 (server filemanger API Endpoints)
+# Endpoint: Edit a file
+@app.route('/edit', methods=['POST'])
+def edit():
+    username = request.json.get('username')
+    file_id = request.json.get('file_id')
+    new_content = request.json.get('content')
+    try:
+        file_manager.edit_file(username, file_id, new_content.encode())
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 403
+
+# Endpoint: Delete a file
+@app.route('/delete', methods=['POST'])
+def delete():
+    username = request.json.get('username')
+    file_id = request.json.get('file_id')
+    try:
+        file_manager.delete_file(username, file_id)
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 403
+
+# Endpoint: Share a file
+@app.route('/share', methods=['POST'])
+def share():
+    username = request.json.get('username')
+    file_id = request.json.get('file_id')
+    designated_users = request.json.get('users')
+    try:
+        file_manager.share_file(username, file_id, designated_users)
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 403
+
+<<<<<<< HEAD
+# Endpoint: Get a file's content and AES key
+=======
+# Endpoint: Get a file's content
+>>>>>>> 23824c8 (server filemanger API Endpoints)
+@app.route('/get', methods=['POST'])
+def get_file():
+    username = request.json.get('username')
+    file_id = request.json.get('file_id')
+    try:
+<<<<<<< HEAD
+        # get_file now returns both file content and AES key.
+        content, aes_key = file_manager.get_file(username, file_id)
+        # Assuming the file content is text, decode it before returning.
+        return jsonify({"content": content.decode(), "aes_key": aes_key})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 403
+
+# Endpoint: View all files of a user
+@app.route('/get_users', methods=['POST'])
+def get_users():
+    try:
+        users_names = ','.join(file_manager.get_user())
+        return jsonify({"message": users_names})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 403
+    
+
+
+
+# Endpoint: View all files of a user
+@app.route('/view_files', methods=['POST'])
+def view_files():
+    username = request.json.get('username')
+    try:
+        files = file_manager.view_files(username)
+        return jsonify({"message": files})
+=======
+        content = file_manager.get_file(username, file_id)
+        return jsonify({"content": content.decode()})
+>>>>>>> 23824c8 (server filemanger API Endpoints)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 403
+
+
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    app.run(host="0.0.0.0", port=5200, debug=True)

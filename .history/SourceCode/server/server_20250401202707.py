@@ -191,4 +191,4 @@ def require_rsa():
     return jsonify({"rsa": user_rsa})
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    app.run(host="0.0.0.0", port=5200, debug=True)
