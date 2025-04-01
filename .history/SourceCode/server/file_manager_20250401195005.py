@@ -179,33 +179,36 @@ class FileManager:
         self.conn.close()
 
 
+# Example usage:
 if __name__ == "__main__":
     fm = FileManager()
 
-    # Owner uploads a file.
-    owner = "alice"
-    original_file_id = fm.add_file(owner, "document.txt", b"This is the original file content.")
-    print("Original file ID:", original_file_id)
+    # User 'alice' uploads a file.
+    file_id = fm.add_file("alice", "report.txt", b"This is Alice's confidential report.")
+    print("Alice uploaded file with ID:", file_id)
 
-    # Owner shares the file with Bob and Carol.
-    share_info = {
-        "bob": b"Shared content for Bob.",
-        "carol": b"Shared content for Carol."
-    }
-    shared_ids = fm.share_file(owner, original_file_id, share_info)
-    print("Shared file IDs:", shared_ids)
+    # Alice edits her file.
+    fm.edit_file("alice", file_id, b"Updated content for Alice's report.")
 
-    # View files for Bob.
-    bob_files = fm.view_files("bob")
-    print("Bob's files:", bob_files)
+    # Alice shares the file with 'bob'.
+    fm.share_file("alice", file_id, ["bob"])
+    
+    # Bob attempts to access the shared file.
+    try:
+        content = fm.get_file("bob", file_id)
+        print("Bob accessed file content:", content.decode())
+    except PermissionError as e:
+        print("Access denied for Bob:", e)
 
-    # Bob retrieves his shared file.
-    # Use the file id generated during share_file for Bob.
-    bob_file_id = shared_ids.get("bob")
-    if bob_file_id:
-        content, access = fm.get_file("bob", bob_file_id)
-        print("Bob's file content:", content.decode())  # Assuming text content
-        print("File access type:", access)
+    # Unauthorized user 'eve' tries to access the file.
+    try:
+        content = fm.get_file("eve", file_id)
+        print("Eve accessed file content:", content.decode())
+    except PermissionError as e:
+        print("Access denied for Eve:", e)
+
+    # Close the file manager when done.
+    fm.close()
 
     
     
