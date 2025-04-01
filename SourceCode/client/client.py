@@ -24,7 +24,7 @@ class Client:
                 status = self.user_management.login_user_IO()
                 if status[0]:
                     print("[INFO] Login successful.")
-                    self.session(status[1])
+                    self.session(status[1], status[2])
             elif choice == "3":
                 status = self.user_management.reset_password_IO()
                 if status:
@@ -36,27 +36,30 @@ class Client:
                 print("Invalid choice. Please try again.")
     
     
-    def session(self, username):
+    def session(self, username, password):
         while True:
             print("\nHome Page:")
             print("1. View Storage")
             print("2. Upload File")
             print("3. Download File")
             print("4. Edit File")
-            print("5. Share File")
-            print("6. Log Out")
+            print("5. Delete File")
+            print("6. Share File")
+            print("7. Log Out")
             choice = input("Enter your choice:\n> ").strip()
             if choice == "1":
                 self.user_management.user_read_storage(username)
             elif choice == "2":
-                self.user_management.upload_file(username)
+                self.user_management.upload_file(username, password)
             elif choice == "3":
-                self.user_management.download_file(username)
+                self.user_management.download_file(username, password)
             elif choice == "4":
-                self.user_management.edit_file(username)
+                self.user_management.edit_file(username, password)
             elif choice == "5":
-                self.user_management.share_users(username)
+                self.user_management.delete_file(username)
             elif choice == "6":
+                self.user_management.share_users(username)
+            elif choice == "7":
                 print("User Logging Out...")
                 break
             else:

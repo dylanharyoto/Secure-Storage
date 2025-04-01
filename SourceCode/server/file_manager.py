@@ -44,6 +44,18 @@ class FileManager:
         )
         self.conn.commit()
         return file_id
+    
+    def get_user_aes(self, username):
+        """Retrieve aes key for a given username"""
+        self.cursor.execute('''SELECT key FROM users WHERE username = ?''', (username,))
+        user_aes = self.cursor.fetchone()
+        return user_aes
+    
+    def get_user_rsa(self, username):
+        """Retrieve aes key for a given username"""
+        self.cursor.execute('''SELECT pk FROM users WHERE username = ?''', (username,))
+        user_rsa = self.cursor.fetchone()
+        return user_rsa
 
     def edit_file(self, username, file_id, new_content):
         """Edit an existing file if the user is the owner."""

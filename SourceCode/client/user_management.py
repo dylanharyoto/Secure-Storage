@@ -1,7 +1,7 @@
 import requests
 import os
 from SourceCode.shared.utils import check_username_regex, check_password_regex, generate_aes, hash_password, split_aes
-from encryption import CryptoHandler
+from encryption import AES_encrypt, generate_rsa_keys, encrypt_file, decrypt_file, encrypt_file_for_sharing, decrypt_shared_file
 
 class UserManagement:
     def __init__(self):
@@ -51,16 +51,14 @@ class UserManagement:
                     print("[ERROR] Passwords do not match.")
                     continue
                 try:
-
-                    aes_key = generate_aes()
-                    server_aes, client_aes = split_aes(aes_key)
-                    response = requests.post(f"{self.server_url}/register", json={"username": username, "password": password1, "key": server_aes.hex()})
+                    encrypted_combined_key, recover_key = AES_encrypt(password1)
+                    sk, pk = generate_rsa_keys()
+                    response = requests.post(f"{self.server_url}/register", json={"username": username, "password": password1, 
+                                                                                  "aes": encrypted_combined_key, "rsa": pk})
                     if response.status_code == 200:
                         flag_password2 = True
-                        response = response.json()
-                        client_aes = bytes.fromhex(client_aes.hex())  
                         print(f"[STATUS] Email '{username}' registered successfully.")
-                        return client_aes
+                        return recover_key, sk
                     else:
                         print("[ERROR] Server error.")
                         return False
@@ -76,7 +74,7 @@ class UserManagement:
             if not flag_username:
                 username = input('Enter your email address (or type "q" to EXIT):\n> ').strip()
                 if username == "q":
-                    return False, None
+                    return False
                 if not check_username_regex(username):
                     print('[ERROR] Invalid email format.')
                     continue
@@ -88,16 +86,16 @@ class UserManagement:
                         flag_username = True
                     else:
                         print("[ERROR] Server error.")
-                        return False, None
+                        return False
                 except requests.exceptions.RequestException as e:
                     print(f"[ERROR] Network error: {e}.")
-                    return False, None
+                    return False
             elif not flag_password:
                 password = input('Enter your password (or type "q" to EXIT, "b" to BACK):\n> ').strip()
                 if password == "q":
-                    return False, None
+                    return False
                 if password == "b":
-                    flag_username = False, None
+                    flag_username = False
                     break
                 if not check_password_regex(password):
                     print("[ERROR] Password must be at least 8 characters long!")
@@ -110,11 +108,11 @@ class UserManagement:
                         print("[ERROR] Incorrect password.")
                     else:
                         print("[ERROR] Server error.")
-                        return False, None
+                        return False
                 except requests.exceptions.RequestException as e:
                     print(f"[ERROR] Network error: {e}.")
-                    return False, None
-        return True, username
+                    return False
+        return True, username, password
 
     def reset_password_IO(self):
         flag_username, flag_old_password, flag_new_password1, flag_new_password2 = False, False, False, False
@@ -197,7 +195,7 @@ class UserManagement:
     
     
     
-    def upload_file(self, username):
+    def upload_file(self, username, password):
         """
         Encrypt and upload a file to the server
         """
@@ -206,27 +204,37 @@ class UserManagement:
             return None
         
         if os.path.isfile(file_path):
+            file_name = os.path.basename(file_path)
             # Encrypt the target file and store cipher text into temp file
-            encrypter = CryptoHandler()
-            encry_file_path = None
-            #### user encrypter to process original file and make a temp new file, store the path of new into encry_file_path
+            encry_file_path = os.path.join("temp", file_name)
+            # Get user's encrypted aes key from server
+            data = {'username': username}
+            try:
+                response = requests.post(f"{self.server_url}/require_aes", data=data)
+            except requests.exceptions.RequestException as e:
+                print(f"[ERROR] Network error: {e}.")
+                return None
+            user_aes = response.json()['aes']
+            # Process original file and make a temp new file, store the path of new into encry_file_path
+            encrypt_file(password, user_aes, file_path, encry_file_path)
 
             # Open the temp file and send to server
             with open(encry_file_path, 'rb') as file:
                 files = {'file': file}
-                data = {'username': username}
             try:
                     response = requests.post(f"{self.server_url}/upload", files=files, data=data)
                     if response.status_code == 400:
                         print(f"[ERROR] {response.json()["error"]}")
                         return None
+                    # Remove the temp file
+                    os.remove(encry_file_path)
                     return response.json()
             except requests.exceptions.RequestException as e:
                 print(f"[ERROR] Network error: {e}.")
                 return None
         print("[ERROR] Invalid file path or file does not exist.")
 
-    def edit_file(self, username):
+    def edit_file(self, username, password):
         """
         Update the target file by sending new content to server
         """
@@ -254,10 +262,23 @@ class UserManagement:
                     continue
                 file_path = choice
                 if os.path.isfile(file_path):
+                    
+                    file_name = os.path.basename(file_path)
                     # Encrypt the target file and store cipher text into temp file
-                    encrypter = CryptoHandler()
-                    encry_file_path = None
-                    #### use encrypter to process original file and make a temp new file, store the path of new into encry_file_path
+                    encry_file_path = os.path.join("temp", file_name)
+                    # Get user's encrypted aes key from server
+                    data = {'username': username}
+                    try:
+                        response = requests.post(f"{self.server_url}/require_aes", data=data)
+                        if response.status_code == 400:
+                            print(f"[ERROR] {response.json()["error"]}")
+                            return None
+                    except requests.exceptions.RequestException as e:
+                        print(f"[ERROR] Network error: {e}.")
+                        return None
+                    user_aes = response.json()['aes']
+                    # Process original file and make a temp new file, store the path of new into encry_file_path
+                    encrypt_file(password, user_aes, file_path, encry_file_path)
 
                     # Open the temp file and send to server
                     with open(encry_file_path, 'rb') as file:
@@ -267,8 +288,10 @@ class UserManagement:
                     data = {'username': username, 'file_id': file_id, 'content': new_content}
                     response = requests.post(f"{self.server_url}/edit", json=data)
                     if response.status_code == 403:
-                            print(f"[ERROR] {response.json()["error"]}")
-                            return None
+                        print(f"[ERROR] {response.json()["error"]}")
+                        return None
+                    # Remove the temp file
+                    os.remove(encry_file_path)
                     return response.json()
                 print("[ERROR] Invalid file path or file does not exist.")
             
@@ -291,8 +314,9 @@ class UserManagement:
             data = {'username': username, 'file_id': file_id}
             response = requests.post(f"{self.server_url}/delete", json=data)
 
-            ####ERROR
-
+            if response.status_code == 403:
+                print(f"[ERROR] {response.json()["error"]}")
+                return None
             return response.json()
             
         except ValueError:

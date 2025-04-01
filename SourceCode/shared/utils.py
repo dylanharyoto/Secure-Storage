@@ -13,6 +13,7 @@ def init_database(db_file_name, table_name):
                 username TEXT PRIMARY KEY,
                 password TEXT NOT NULL, 
                 key TEXT NOT NULL
+                pk TEXT NOT NULL
             )
         ''')
         conn.commit()
@@ -33,11 +34,3 @@ def check_username_regex(username):
 
 def check_password_regex(password):
     return len(password) >= 8
-
-def generate_aes():
-    return os.urandom(16)
-
-def split_aes(key):
-    key_part_server = key[:8]  # First 64 bits
-    key_part_client = key[8:]  # Last 64 bits
-    return key_part_server, key_part_client

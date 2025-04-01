@@ -3,7 +3,7 @@ import sqlite3
 import os
 import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
-from SourceCode.shared.utils import generate_aes, hash_password, split_aes, init_database, check_password  # Import check_password
+from SourceCode.shared.utils import hash_password, init_database, check_password  # Import check_password
 from file_manager import FileManager
 
 # Initialize Flask app
@@ -45,13 +45,14 @@ def register():
     data = request.json
     username = data.get('username')
     password = data.get('password')
-    server_aes = data.get('key')
+    user_aes = data.get('aes')
+    user_rsa = data.get('rsa')
     db = get_db()
     cursor = db.cursor()
     hashed_password = hash_password(password)
     cursor.execute(
-        "INSERT INTO users (username, password, key) VALUES (?, ?, ?)",
-        (username, hashed_password, server_aes)
+        "INSERT INTO users (username, password, key, pk) VALUES (?, ?, ?, ?)",
+        (username, hashed_password, user_aes, user_rsa)
     )
     db.commit()
     return jsonify({"message": "Registered Successfully"}), 200
@@ -95,6 +96,24 @@ def upload():
 
     file_id = file_manager.add_file(username, file.filename, file.read())
     return jsonify({"file_id": file_id})
+
+# Endpoint: Require AES key
+@app.route('/require_aes', methods=['POST'])
+def require_aes():
+    username = request.form.get('username')
+    user_aes = file_manager.get_user_aes(username)
+    if not user_aes:
+        return jsonify({"error": f"AES key for {username} not found"}), 400
+    return jsonify({"aes": user_aes})
+
+# Endpoint: Require RSA key
+@app.route('/require_rsa', methods=['POST'])
+def require_rsa():
+    username = request.form.get('username')
+    user_rsa = file_manager.get_user_aes(username)
+    if not user_rsa:
+        return jsonify({"error": f"RSA key for {username} not found"}), 400
+    return jsonify({"rsa": user_rsa})
 
 # Endpoint: Edit a file
 @app.route('/edit', methods=['POST'])
@@ -146,7 +165,7 @@ def get_file():
 
 # Endpoint: View all files of a user
 @app.route('/get_users', methods=['POST'])
-def view_files():
+def get_users():
     try:
         users_names = ','.join(file_manager.get_user())
         return jsonify({"message": users_names})
