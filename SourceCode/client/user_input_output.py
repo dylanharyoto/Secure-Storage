@@ -1,9 +1,9 @@
 import requests
 import os
 from SourceCode.shared.utils import check_username_regex, check_password_regex, generate_aes, hash_password, split_aes
-from encryption import AES_encrypt, generate_rsa_keys, encrypt_file, decrypt_file, encrypt_file_for_sharing, decrypt_shared_file
+from encryption import AES_encrypt, generate_rsa_keys, encrypt_file, decrypt_file, encrypt_file_for_sharing, decrypt_shared_file, recover_key_check
 
-class UserManagement:
+class User_Iuput_Output:
     def __init__(self):
         self.server_url = "http://localhost:5200"  # Adjust if the server runs on a different host/port
 
@@ -115,9 +115,9 @@ class UserManagement:
         return True, username, password
 
     def reset_password_IO(self):
-        flag_username, flag_old_password, flag_new_password1, flag_new_password2 = False, False, False, False
-        username, old_password, new_password1, new_password2 = None, None, None, None
-        while not (flag_username and flag_old_password and flag_new_password1 and flag_new_password2):
+        flag_username, flag_recover_key, flag_new_password1, flag_new_password2 = False, False, False, False
+        username, recover_key, new_password1, new_password2 = None, None, None, None
+        while not (flag_username and flag_recover_key and flag_new_password1 and flag_new_password2):
             if not flag_username:
                 username = input('Enter your email address (or type "q" to EXIT):\n> ').strip()
                 if username == "q":
@@ -129,6 +129,7 @@ class UserManagement:
                     response = requests.post(f"{self.server_url}/check_username", json={"username": username})
                     if response.status_code == 200:
                         print("[ERROR] Email not found.")
+                        continue
                     elif response.status_code == 201:
                         flag_username = True
                     else:
@@ -137,32 +138,36 @@ class UserManagement:
                 except requests.exceptions.RequestException as e:
                     print(f"[ERROR] Network error: {e}")
                     return False
-            elif not flag_old_password:
-                old_password = input('Enter your old password (or type "q" to EXIT, "b" to BACK):\n> ').strip()
-                if old_password == "q":
+            elif not flag_recover_key:
+                recover_key = input('Enter your recover key (or type "q" to EXIT, "b" to BACK):\n> ').strip()
+                if recover_key == "q":
                     return False
-                if old_password == "b":
+                if recover_key == "b":
                     flag_username = False
                     continue
                 try:
-                    response = requests.post(f"{self.server_url}/login", json={"username": username, "password": old_password})
+                    response = requests.post(f"{self.server_url}/require_aes", json={"username": username})
                     if response.status_code == 200:
-                        flag_old_password = True
-                    elif response.status_code == 201:
-                        print("[ERROR] Incorrect password.")
+                        user_aes = response.json()['aes']
+                        key_check = recover_key_check(recover_key, user_aes)
+                        if key_check[0]:
+                            flag_recover_key = True
+                            aes_plaintext = key_check[1]
+                    elif response.status_code == 400:
+                        print(f"[ERROR] {response.json()["error"]}")
+                        continue
                     else:
                         print("[ERROR] Server error")
                         return False
                 except requests.exceptions.RequestException as e:
                     print(f"[ERROR] Network error: {e}")     
-                    return False           
-            elif not flag_new_password1:
-                new_password1 = input('Enter a new password with at least 8 characters (or type "q" to EXIT, "b" to BACK):\n> ').strip()
+                    return False    
+            
+            # User passed the authentication test, now is able to reset the password
+            if not flag_new_password1:
+                new_password1 = input('Enter a new password with at least 8 characters (or type "q" to EXIT):\n> ').strip()
                 if new_password1 == "q":
                     return False
-                if new_password1 == "b":
-                    flag_old_password = False
-                    continue
                 if not check_password_regex(new_password1):
                     print("[ERROR] Password must be at least 8 characters long.")
                     continue
@@ -177,20 +182,24 @@ class UserManagement:
                 if new_password2 != new_password1:
                     print("[ERROR] Passwords do not match.")
                     continue
+
+                
+
                 try:
-                    response = requests.post(f"{self.server_url}/reset_password", json={
-                        "username": username,
-                        "new_password": new_password1
-                    })
+                    encrypted_combined_key, recover_key = AES_encrypt(new_password1, aes_plaintext)
+
+
                     if response.status_code == 200:
-                        flag_new_password2 = True
-                        print(f"[STATUS] Password for '{username}' has been successfully reset.")
+                        flag_password2 = True
+                        print(f"[STATUS] Email '{username}' registered successfully.")
+                        return recover_key, sk
                     else:
-                        print("[ERROR] Server error")
+                        print("[ERROR] Server error.")
                         return False
                 except requests.exceptions.RequestException as e:
-                    print(f"[ERROR] Network error: {e}")
+                    print(f"[ERROR] Network error: {e}.")
                     return False
+
         return True
     
     
@@ -385,10 +394,15 @@ class UserManagement:
             # proceed to send all selected users to server
             if choice == "p":
                 try:
+
+                    ##############################################################
+                    # Server return the encrypted file, and all pk for the users #
+                    ##############################################################
+
                     data = {'username': username, 'file_id': file_id, 'users': user_names}
                     response = requests.post(f"{self.server_url}/share", json=data)
 
-                    ####ERROR
+                    
                     
                     return response.json()
                 except requests.exceptions.RequestException as e:
@@ -402,7 +416,7 @@ class UserManagement:
             except IndexError:
                 print("[ERROR] Please input a valid user index")
                 continue
-    def download_file(self, username):
+    def download_file(self, username, password):
         """
         Download an existing file from the server to a specific directory.
         """
@@ -443,69 +457,3 @@ class UserManagement:
                 print("[ERROR] Server error.")
         except requests.exceptions.RequestException as e:
             print(f"[ERROR] Network error: {e}.")
-    
-    
-    '''
-Request Examples of File Manager
-
-import requests
-
-SERVER_URL = "http://localhost:5000"
-
-def upload_file(username, file_path):
-    with open(file_path, 'rb') as file:
-        files = {'file': file}
-        data = {'username': username}
-        response = requests.post(f"{SERVER_URL}/upload", files=files, data=data)
-    return response.json()
-
-def edit_file(username, file_id, new_content):
-    data = {'username': username, 'file_id': file_id, 'content': new_content}
-    response = requests.post(f"{SERVER_URL}/edit", json=data)
-    return response.json()
-
-def delete_file(username, file_id):
-    data = {'username': username, 'file_id': file_id}
-    response = requests.post(f"{SERVER_URL}/delete", json=data)
-    return response.json()
-
-def share_file(username, file_id, users):
-    data = {'username': username, 'file_id': file_id, 'users': users}
-    response = requests.post(f"{SERVER_URL}/share", json=data)
-    return response.json()
-
-def get_file(username, file_id):
-    data = {'username': username, 'file_id': file_id}
-    response = requests.post(f"{SERVER_URL}/get", json=data)
-    return response.json()
-
-
-
-
-if __name__ == "__main__":
-    username = "alice"
-    file_path = "example.txt"
-    
-    # Upload a file
-    upload_response = upload_file(username, file_path)
-    print("Upload Response:", upload_response)
-    
-    if "file_id" in upload_response:
-        file_id = upload_response["file_id"]
-        
-    # Edit the file
-    edit_response = edit_file(username, file_id, "Updated content")
-    print("Edit Response:", edit_response)
-    
-    # Share the file
-    share_response = share_file(username, file_id, ["bob"])
-    print("Share Response:", share_response)
-    
-    # Get the file (as Bob)
-    get_response = get_file("bob", file_id)
-    print("Get Response (Bob):", get_response)
-    
-    # Delete the file
-    delete_response = delete_file(username, file_id)
-    print("Delete Response:", delete_response)
-'''

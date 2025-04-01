@@ -104,7 +104,7 @@ def require_aes():
     user_aes = file_manager.get_user_aes(username)
     if not user_aes:
         return jsonify({"error": f"AES key for {username} not found"}), 400
-    return jsonify({"aes": user_aes})
+    return jsonify({"aes": user_aes}), 200
 
 # Endpoint: Require RSA key
 @app.route('/require_rsa', methods=['POST'])
@@ -171,9 +171,6 @@ def get_users():
         return jsonify({"message": users_names})
     except Exception as e:
         return jsonify({"error": str(e)}), 403
-    
-
-
 
 # Endpoint: View all files of a user
 @app.route('/view_files', methods=['POST'])
