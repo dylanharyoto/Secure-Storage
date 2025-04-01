@@ -86,18 +86,7 @@ def reset_password():
     db.commit()
     return jsonify({"message": "password reset"}), 200
 
-
-# Endpoint: View all files of a user
-@app.route('/view_files', methods=['POST'])
-def view_files():
-    username = request.json.get('username')
-    try:
-        files = file_manager.view_files(username)
-        return jsonify({"files": files})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 403
-
-# Endpoint: Upload a file
+# Endpoint: Upload a file (owned)
 @app.route('/upload', methods=['POST'])
 def upload():
     username = request.form.get('username')
@@ -107,7 +96,6 @@ def upload():
 
     file_id = file_manager.add_file(username, file.filename, file.read())
     return jsonify({"file_id": file_id})
-
 
 # Endpoint: Edit a file (only if owned by the requester)
 @app.route('/edit', methods=['POST'])
@@ -156,7 +144,7 @@ def share():
         return jsonify({"shared_file_ids": new_ids})
     except Exception as e:
         return jsonify({"error": str(e)}), 403
-      
+
 # Endpoint: View all files for a user
 @app.route('/view_files', methods=['POST'])
 def view_files():
@@ -169,8 +157,7 @@ def view_files():
     except Exception as e:
         return jsonify({"error": str(e)}), 403
 
-# Endpoint: Get a file's content
-
+# Updated Endpoint: Get a file's content and access attribute
 @app.route('/get', methods=['POST'])
 def get_file():
     username = request.json.get('username')
@@ -183,7 +170,6 @@ def get_file():
         return jsonify({"content": content.decode(), "access": access})
     except Exception as e:
         return jsonify({"error": str(e)}), 403
-
 
 
 # Endpoint: Require AES key
@@ -204,6 +190,5 @@ def require_rsa():
         return jsonify({"error": f"RSA key for {username} not found"}), 400
     return jsonify({"rsa": user_rsa})
 
-
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    app.run(host="0.0.0.0", port=5200, debug=True)

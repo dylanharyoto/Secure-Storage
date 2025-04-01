@@ -23,21 +23,24 @@ class FileManager:
                 file_id TEXT PRIMARY KEY,
                 owner TEXT NOT NULL,
                 filename TEXT NOT NULL,
-                access TEXT NOT NULL,
                 content BLOB NOT NULL
+            )
+        """)
+        self.cursor.execute("""
+            CREATE TABLE IF NOT EXISTS shares (
+                file_id TEXT NOT NULL,
+                shared_with TEXT NOT NULL,
+                FOREIGN KEY(file_id) REFERENCES files(file_id)
             )
         """)
         self.conn.commit()
 
     def add_file(self, username, filename, content):
-        """
-        Add a new file to the system.
-        The file is owned by the uploader and its access is set to 'owned'.
-        """
+        """Add a new file to the files database."""
         file_id = str(uuid.uuid4())
         self.cursor.execute(
-            "INSERT INTO files (file_id, owner, filename, content, access) VALUES (?, ?, ?, ?, ?)",
-            (file_id, username, filename, content, "owned")
+            "INSERT INTO files (file_id, owner, filename, content) VALUES (?, ?, ?, ?)",
+            (file_id, username, filename, content)
         )
         self.conn.commit()
         return file_id
@@ -55,17 +58,11 @@ class FileManager:
         return user_rsa
 
     def edit_file(self, username, file_id, new_content):
-        """
-        Edit an existing file's content.
-        Only allowed if the file is owned by the requesting user.
-        """
+        """Edit an existing file if the user is the owner."""
         self.cursor.execute("SELECT owner FROM files WHERE file_id = ?", (file_id,))
         result = self.cursor.fetchone()
         if result and result[0] == username:
-            self.cursor.execute(
-                "UPDATE files SET content = ? WHERE file_id = ?",
-                (new_content, file_id)
-            )
+            self.cursor.execute("UPDATE files SET content = ? WHERE file_id = ?", (new_content, file_id))
             self.conn.commit()
         else:
             raise PermissionError("You do not have permission to edit this file.")
@@ -81,48 +78,20 @@ class FileManager:
         else:
             raise PermissionError("You do not have permission to delete this file.")
 
-    def share_file(self, username, file_id, share_info):
+    def share_file(self, username, file_id, users):
         """
         Share a file with designated users.
-        
-        Parameters:
-          username   : The owner who is sharing the file.
-          file_id    : The original file_id (must belong to username).
-          share_info : A dict mapping each shared user to their shared file content.
-                       Example: { "bob": b"Bob's version of file content", ... }
-        
-        For each entry in share_info, a new row is created in the files table:
-          - file_id: New generated ID.
-          - owner: The shared user. 
-          - filename: "shared" + original filename.
-          - content: The provided shared content.
-          - access: "shared".
+        The file owner must be the one sharing the file.
         """
-        # Retrieve the original file to get its filename and verify ownership.
-        self.cursor.execute(
-            "SELECT owner, filename FROM files WHERE file_id = ? AND access = 'owned'",
-            (file_id,)
-        )
+        self.cursor.execute("SELECT owner FROM files WHERE file_id = ?", (file_id,))
         result = self.cursor.fetchone()
-        if not result:
-            raise ValueError("Original file not found or not owned by the user.")
-        original_owner, original_filename = result
-        if original_owner != username:
+        if result and result[0] == username:
+            for user in users:
+                self.cursor.execute("INSERT INTO shares (file_id, shared_with) VALUES (?, ?)", (file_id, user))
+            self.conn.commit()
+        else:
             raise PermissionError("You do not have permission to share this file.")
 
-        # For each shared user, insert a new row.
-        new_file_ids = {}
-        for shared_user, shared_content in share_info.items():
-            new_file_id = str(uuid.uuid4())
-            shared_filename = "shared" + original_filename
-            self.cursor.execute(
-                "INSERT INTO files (file_id, owner, filename, content, access) VALUES (?, ?, ?, ?, ?)",
-                (new_file_id, shared_user, shared_filename, shared_content, "shared")
-            )
-            new_file_ids[shared_user] = new_file_id
-        self.conn.commit()
-        return new_file_ids
-    
     def get_file(self, username, file_id):
         """
         Retrieve the file's content and the AES key.
@@ -163,49 +132,53 @@ class FileManager:
 
     def view_files(self, username):
         """
-        Return a list of files for the specified user.
-        Each file is represented as a dictionary with keys: file_id, filename, and access.
+        Retrieve all file names and IDs that are either owned by the user or shared with the user.
+        Returns a dictionary in the format: {file_id: filename}
         """
-        self.cursor.execute(
-            "SELECT file_id, filename, access FROM files WHERE owner = ?",
-            (username,)
-        )
-        rows = self.cursor.fetchall()
-        files = [{"file_id": fid, "filename": fname, "access": access} for fid, fname, access in rows]
-        return files
+        self.cursor.execute("""
+            SELECT file_id, filename FROM files 
+            WHERE owner = ? OR file_id IN (
+                SELECT file_id FROM shared_files WHERE shared_user = ?
+            )
+        """, (username, username))
+        content = "\n".join([("File id " + str(file[0]) + ": " + file[1]) for file in self.cursor.fetchall()])
+        return content
 
     def close(self):
         """Close the database connection."""
         self.conn.close()
 
 
+# Example usage:
 if __name__ == "__main__":
     fm = FileManager()
 
-    # Owner uploads a file.
-    owner = "alice"
-    original_file_id = fm.add_file(owner, "document.txt", b"This is the original file content.")
-    print("Original file ID:", original_file_id)
+    # User 'alice' uploads a file.
+    file_id = fm.add_file("alice", "report.txt", b"This is Alice's confidential report.")
+    print("Alice uploaded file with ID:", file_id)
 
-    # Owner shares the file with Bob and Carol.
-    share_info = {
-        "bob": b"Shared content for Bob.",
-        "carol": b"Shared content for Carol."
-    }
-    shared_ids = fm.share_file(owner, original_file_id, share_info)
-    print("Shared file IDs:", shared_ids)
+    # Alice edits her file.
+    fm.edit_file("alice", file_id, b"Updated content for Alice's report.")
 
-    # View files for Bob.
-    bob_files = fm.view_files("bob")
-    print("Bob's files:", bob_files)
+    # Alice shares the file with 'bob'.
+    fm.share_file("alice", file_id, ["bob"])
+    
+    # Bob attempts to access the shared file.
+    try:
+        content = fm.get_file("bob", file_id)
+        print("Bob accessed file content:", content.decode())
+    except PermissionError as e:
+        print("Access denied for Bob:", e)
 
-    # Bob retrieves his shared file.
-    # Use the file id generated during share_file for Bob.
-    bob_file_id = shared_ids.get("bob")
-    if bob_file_id:
-        content, access = fm.get_file("bob", bob_file_id)
-        print("Bob's file content:", content.decode())  # Assuming text content
-        print("File access type:", access)
+    # Unauthorized user 'eve' tries to access the file.
+    try:
+        content = fm.get_file("eve", file_id)
+        print("Eve accessed file content:", content.decode())
+    except PermissionError as e:
+        print("Access denied for Eve:", e)
+
+    # Close the file manager when done.
+    fm.close()
 
     
     

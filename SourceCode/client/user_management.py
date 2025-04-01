@@ -1,5 +1,7 @@
 import requests
-from SourceCode.shared.utils import check_username_regex, check_password_regex, hash_password
+import os
+from SourceCode.shared.utils import check_username_regex, check_password_regex, generate_aes, hash_password, split_aes
+from encryption import AES_encrypt, generate_rsa_keys, encrypt_file, decrypt_file, encrypt_file_for_sharing, decrypt_shared_file
 
 class UserManagement:
     def __init__(self):
@@ -49,13 +51,14 @@ class UserManagement:
                     print("[ERROR] Passwords do not match.")
                     continue
                 try:
-                    response = requests.post(f"{self.server_url}/register", json={"username": username, "password": password1})
+                    encrypted_combined_key, recover_key = AES_encrypt(password1)
+                    sk, pk = generate_rsa_keys()
+                    response = requests.post(f"{self.server_url}/register", json={"username": username, "password": password1, 
+                                                                                  "aes": encrypted_combined_key, "rsa": pk})
                     if response.status_code == 200:
                         flag_password2 = True
-                        response = response.json()
-                        client_aes = bytes.fromhex(response["message"])  
                         print(f"[STATUS] Email '{username}' registered successfully.")
-                        return client_aes
+                        return recover_key, sk
                     else:
                         print("[ERROR] Server error.")
                         return False
@@ -109,7 +112,7 @@ class UserManagement:
                 except requests.exceptions.RequestException as e:
                     print(f"[ERROR] Network error: {e}.")
                     return False
-        return True
+        return True, username, password
 
     def reset_password_IO(self):
         flag_username, flag_old_password, flag_new_password1, flag_new_password2 = False, False, False, False
@@ -189,3 +192,320 @@ class UserManagement:
                     print(f"[ERROR] Network error: {e}")
                     return False
         return True
+    
+    
+    
+    def upload_file(self, username, password):
+        """
+        Encrypt and upload a file to the server
+        """
+        file_path = input("Please input the path of the file to be uploaded (or type \"q\" to EXIT):\n> ")
+        if file_path == 'q':
+            return None
+        
+        if os.path.isfile(file_path):
+            file_name = os.path.basename(file_path)
+            # Encrypt the target file and store cipher text into temp file
+            encry_file_path = os.path.join("temp", file_name)
+            # Get user's encrypted aes key from server
+            data = {'username': username}
+            try:
+                response = requests.post(f"{self.server_url}/require_aes", data=data)
+            except requests.exceptions.RequestException as e:
+                print(f"[ERROR] Network error: {e}.")
+                return None
+            user_aes = response.json()['aes']
+            # Process original file and make a temp new file, store the path of new into encry_file_path
+            encrypt_file(password, user_aes, file_path, encry_file_path)
+
+            # Open the temp file and send to server
+            with open(encry_file_path, 'rb') as file:
+                files = {'file': file}
+            try:
+                    response = requests.post(f"{self.server_url}/upload", files=files, data=data)
+                    if response.status_code == 400:
+                        print(f"[ERROR] {response.json()["error"]}")
+                        return None
+                    # Remove the temp file
+                    os.remove(encry_file_path)
+                    return response.json()
+            except requests.exceptions.RequestException as e:
+                print(f"[ERROR] Network error: {e}.")
+                return None
+        print("[ERROR] Invalid file path or file does not exist.")
+
+    def edit_file(self, username, password):
+        """
+        Update the target file by sending new content to server
+        """
+        # file flag tests if user has already input a target file, and path flag tests if user finish process
+        path_flag = False
+        file_flag = False
+        file_id = 0
+        while not path_flag:
+            try:
+                # Query user for the file id of file to be edited
+                if not file_flag:
+                    choice = input("Please input the file ID for the file to be edited (or type \"q\" to EXIT):\n> ")
+                    if choice == 'q':
+                        return None
+                    file_id = int(choice)
+                file_flag = True
+
+                # Query user for local file to replace
+                choice = input("Please input the path of the file to be edited  (or type \"q\" to EXIT, \"b\" to BACK):\n> :\n> ")
+                if choice == "q":
+                    return None
+                # Re-enter target file
+                if choice == "b":
+                    file_flag = False
+                    continue
+                file_path = choice
+                if os.path.isfile(file_path):
+                    
+                    file_name = os.path.basename(file_path)
+                    # Encrypt the target file and store cipher text into temp file
+                    encry_file_path = os.path.join("temp", file_name)
+                    # Get user's encrypted aes key from server
+                    data = {'username': username}
+                    try:
+                        response = requests.post(f"{self.server_url}/require_aes", data=data)
+                        if response.status_code == 400:
+                            print(f"[ERROR] {response.json()["error"]}")
+                            return None
+                    except requests.exceptions.RequestException as e:
+                        print(f"[ERROR] Network error: {e}.")
+                        return None
+                    user_aes = response.json()['aes']
+                    # Process original file and make a temp new file, store the path of new into encry_file_path
+                    encrypt_file(password, user_aes, file_path, encry_file_path)
+
+                    # Open the temp file and send to server
+                    with open(encry_file_path, 'rb') as file:
+                        new_content = {'file': file}
+
+                    # Request for the file content from server
+                    data = {'username': username, 'file_id': file_id, 'content': new_content}
+                    response = requests.post(f"{self.server_url}/edit", json=data)
+                    if response.status_code == 403:
+                        print(f"[ERROR] {response.json()["error"]}")
+                        return None
+                    # Remove the temp file
+                    os.remove(encry_file_path)
+                    return response.json()
+                print("[ERROR] Invalid file path or file does not exist.")
+            
+            except ValueError:
+                print("[ERROR] Please input a valid integer")
+            except requests.exceptions.RequestException as e:
+                print(f"[ERROR] Network error: {e}.")
+                return None
+
+    def delete_file(self, username):
+        """
+        Delete the target file from server storage
+        """
+        try:
+            # Query user for the file id of file to be deleted
+            choice = input("Please input the file ID for the file to be edited (or type \"q\" to EXIT):\n> ")
+            if choice == 'q':
+                return None
+            file_id = int(choice)
+            data = {'username': username, 'file_id': file_id}
+            response = requests.post(f"{self.server_url}/delete", json=data)
+
+            if response.status_code == 403:
+                print(f"[ERROR] {response.json()["error"]}")
+                return None
+            return response.json()
+            
+        except ValueError:
+            print("[ERROR] Please input a valid integer")
+            return None
+        except requests.exceptions.RequestException as e:
+            print(f"[ERROR] Network error: {e}.")
+            return None
+    
+    def share_users(self, username):
+        """
+        Fetch all users available and allow current user to choose those to share with
+        Then send information to server
+        """
+        # file flag tests if user has already input a target file, and user flag tests if user finish process
+        user_flag = False
+        file_flag = False
+        file_id = 0
+        user_names = []
+
+        # Fetch all existing users from server
+        try:
+            response = requests.post(f"{self.server_url}/get_users")
+            message = response.json()["message"]
+
+            ####ERROR
+
+            all_users = message.split(',').sort()
+        except requests.exceptions.RequestException as e:
+            print(f"[ERROR] Network error: {e}.")
+            return None
+        
+        while not user_flag:
+            # Query user for the file id of file to be shared
+            if not file_flag:
+                choice = input("Please input the file ID for the file to be shared (or type \"q\" to EXIT):\n> ")
+                if choice == 'q':
+                    return None
+                try:
+                    file_id = int(choice)
+                except ValueError:
+                    print("[ERROR] Please input a valid integer")
+                    continue
+            file_flag = True
+
+            # list all users available to share
+            print("Other current users available are listed below:")
+            [print(f"{i+1}: {all_users[i]}") for i in range(len(all_users)) if username != all_users[i]]
+            if len(user_names)==0:
+                print(f"Added users are: None")
+            else:
+                print(f"Added users are: {','.join(user_names)}")
+
+            # Query user to choose a user to share
+            choice = input("Please input one correspond index of target user to share with,\ntype \"p\" to proceed (or type \"q\" to EXIT, \"b\" to BACK):\n> ")
+            if choice == "q":
+                return None
+            # Re-enter target file
+            if choice == "b":
+                if user_names:
+                    all_users.append(user_names.pop())
+                    all_users = all_users.sort()
+                else:
+                    file_flag = False
+                continue
+            # proceed to send all selected users to server
+            if choice == "p":
+                try:
+                    data = {'username': username, 'file_id': file_id, 'users': user_names}
+                    response = requests.post(f"{self.server_url}/share", json=data)
+
+                    ####ERROR
+                    
+                    return response.json()
+                except requests.exceptions.RequestException as e:
+                    print(f"[ERROR] Network error: {e}.")
+                    return None
+            try:
+                user_names.append(all_users[int(choice)])
+            except ValueError:
+                print("[ERROR] Please input a valid integer")
+                continue
+            except IndexError:
+                print("[ERROR] Please input a valid user index")
+                continue
+    def download_file(self, username):
+        """
+        Download an existing file from the server to a specific directory.
+        """
+        # Query user for the target file id
+        input_flag = False
+        while not input_flag:
+            try:
+                choice = input("Please input the file ID for the file to be downloaded (or type \"q\" to EXIT):\n> ")
+                if choice == 'q':
+                    return None
+                file_id = int(choice)
+
+                # Request for the file content from server
+                data = {'username': username, 'file_id': file_id}
+                response = requests.post(f"{self.server_url}/get", json=data)
+                if response.status_code == 403:
+                        print(f"[ERROR] {response.json()["error"]}")
+                        return None
+                return response.json()
+            
+            except ValueError:
+                print("[ERROR] Please input a valid integer")
+            except requests.exceptions.RequestException as e:
+                print(f"[ERROR] Network error: {e}.")
+                return None
+        
+    def user_read_storage(self, username):
+        """
+        Fetch all file names in the storages that this client can read.
+        """
+        try:
+            response = requests.post(f"{self.server_url}/view_files", json={"username": username})
+
+            #Print out existing files with id
+            if response.status_code == 200:
+                print(response.json()["message"])
+            else:
+                print("[ERROR] Server error.")
+        except requests.exceptions.RequestException as e:
+            print(f"[ERROR] Network error: {e}.")
+    
+    
+    '''
+Request Examples of File Manager
+
+import requests
+
+SERVER_URL = "http://localhost:5000"
+
+def upload_file(username, file_path):
+    with open(file_path, 'rb') as file:
+        files = {'file': file}
+        data = {'username': username}
+        response = requests.post(f"{SERVER_URL}/upload", files=files, data=data)
+    return response.json()
+
+def edit_file(username, file_id, new_content):
+    data = {'username': username, 'file_id': file_id, 'content': new_content}
+    response = requests.post(f"{SERVER_URL}/edit", json=data)
+    return response.json()
+
+def delete_file(username, file_id):
+    data = {'username': username, 'file_id': file_id}
+    response = requests.post(f"{SERVER_URL}/delete", json=data)
+    return response.json()
+
+def share_file(username, file_id, users):
+    data = {'username': username, 'file_id': file_id, 'users': users}
+    response = requests.post(f"{SERVER_URL}/share", json=data)
+    return response.json()
+
+def get_file(username, file_id):
+    data = {'username': username, 'file_id': file_id}
+    response = requests.post(f"{SERVER_URL}/get", json=data)
+    return response.json()
+
+
+
+
+if __name__ == "__main__":
+    username = "alice"
+    file_path = "example.txt"
+    
+    # Upload a file
+    upload_response = upload_file(username, file_path)
+    print("Upload Response:", upload_response)
+    
+    if "file_id" in upload_response:
+        file_id = upload_response["file_id"]
+        
+    # Edit the file
+    edit_response = edit_file(username, file_id, "Updated content")
+    print("Edit Response:", edit_response)
+    
+    # Share the file
+    share_response = share_file(username, file_id, ["bob"])
+    print("Share Response:", share_response)
+    
+    # Get the file (as Bob)
+    get_response = get_file("bob", file_id)
+    print("Get Response (Bob):", get_response)
+    
+    # Delete the file
+    delete_response = delete_file(username, file_id)
+    print("Delete Response:", delete_response)
+'''
