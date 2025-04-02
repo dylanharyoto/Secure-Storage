@@ -40,8 +40,8 @@ def check_username():
         return jsonify({"message": "username exists"}), 201
     return jsonify({"message": "username does not exist"}), 200
 
-@app.route('/register', methods=['POST'])
-def register():
+@app.route('/register_user', methods=['POST'])
+def register_user():
     data = request.json
     username = data.get('username')
     password = data.get('password')
@@ -57,8 +57,8 @@ def register():
     db.commit()
     return jsonify({"message": "Registered Successfully"}), 200
 
-@app.route('/login', methods=['POST'])
-def login():
+@app.route('/login_user', methods=['POST'])
+def login_user():
     data = request.json
     username = data.get('username')
     password = data.get('password')
@@ -85,17 +85,6 @@ def reset_password():
     )
     db.commit()
     return jsonify({"message": "password reset"}), 200
-
-
-# Endpoint: View all files of a user
-@app.route('/view_files', methods=['POST'])
-def view_files():
-    username = request.json.get('username')
-    try:
-        files = file_manager.view_files(username)
-        return jsonify({"files": files})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 403
 
 # Endpoint: Upload a file
 @app.route('/upload_file', methods=['POST'])
@@ -158,13 +147,13 @@ def share_file():
         return jsonify({"error": str(e)}), 403
       
 # Endpoint: View all files for a user
-@app.route('/view_files', methods=['POST'])
-def view_files():
+@app.route('/view_file', methods=['POST'])
+def view_file():
     username = request.json.get('username')
     if not username:
         return jsonify({"error": "Missing username"}), 400
     try:
-        files = file_manager.view_files(username)
+        files = file_manager.view_file(username)
         return jsonify({"files": files})
     except Exception as e:
         return jsonify({"error": str(e)}), 403

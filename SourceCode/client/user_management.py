@@ -1,12 +1,11 @@
 import requests
 import os
-from SourceCode.shared.utils import check_username_regex, check_password_regex, generate_aes, hash_password, split_aes
-from encryption import AES_encrypt, generate_rsa_keys, encrypt_file, decrypt_file, encrypt_file_for_sharing, decrypt_shared_file
+from SourceCode.shared.utils import check_username_regex, check_password_regex
+from encryption import AES_encrypt, generate_rsa_keys, encrypt_file
 
 class UserManagement:
     def __init__(self):
         self.server_url = "http://localhost:5200"  # Adjust if the server runs on a different host/port
-
     def register_user_IO(self):
         flag_username, flag_password1, flag_password2 = False, False, False
         username, password1, password2, encrypted_aes_key, recovery_key, secret_key, public_key = None, None, None, None, None, None, None
@@ -53,7 +52,7 @@ class UserManagement:
                 try:
                     encrypted_aes_key, recovery_key = AES_encrypt(password1)
                     secret_key, public_key = generate_rsa_keys()
-                    response = requests.post(f"{self.server_url}/register", json={"username": username, "password": password1, "encrypted_aes_key": encrypted_aes_key, "public_key": public_key})
+                    response = requests.post(f"{self.server_url}/register_user", json={"username": username, "password": password1, "encrypted_aes_key": encrypted_aes_key, "public_key": public_key})
                     if response.status_code == 200:
                         flag_password2 = True
                         print(f"[STATUS] Email '{username}' registered successfully.")
@@ -65,7 +64,6 @@ class UserManagement:
                     print(f"[ERROR] Network error: {e}.")
                     return False, None, None
         return True, recovery_key, secret_key
-
     def login_user_IO(self):
         flag_username, flag_password = False, False
         username, password = None, None
@@ -100,7 +98,7 @@ class UserManagement:
                     print("[ERROR] Password must be at least 8 characters long!")
                     continue
                 try:
-                    response = requests.post(f"{self.server_url}/login", json={"username": username, "password": password})
+                    response = requests.post(f"{self.server_url}/login_user", json={"username": username, "password": password})
                     if response.status_code == 200:
                         flag_password = True
                     elif response.status_code == 201:
@@ -112,7 +110,6 @@ class UserManagement:
                     print(f"[ERROR] Network error: {e}.")
                     return False, None, None
         return True, username, password
-
     def reset_password_IO(self):
         flag_username, flag_old_password, flag_new_password1, flag_new_password2 = False, False, False, False
         username, old_password, new_password1, new_password2 = None, None, None, None
@@ -144,7 +141,7 @@ class UserManagement:
                     flag_username = False
                     continue
                 try:
-                    response = requests.post(f"{self.server_url}/login", json={"username": username, "password": old_password})
+                    response = requests.post(f"{self.server_url}/login_user", json={"username": username, "password": old_password})
                     if response.status_code == 200:
                         flag_old_password = True
                     elif response.status_code == 201:
@@ -190,9 +187,8 @@ class UserManagement:
                 except requests.exceptions.RequestException as e:
                     print(f"[ERROR] Network error: {e}")
                     return False
-        return True
-    
-    def upload_file(self, username, password):
+        return True  
+    def upload_file_IO(self, username, password):
         """
         Encrypt and upload a file to the server
         """
@@ -230,8 +226,7 @@ class UserManagement:
                 print(f"[ERROR] Network error: {e}.")
                 return None
         print("[ERROR] Invalid file path or file does not exist.")
-
-    def edit_file(self, username, password):
+    def edit_file_IO(self, username, password):
         """
         Update the target file by sending new content to server
         """
@@ -296,8 +291,7 @@ class UserManagement:
             except requests.exceptions.RequestException as e:
                 print(f"[ERROR] Network error: {e}.")
                 return None
-
-    def delete_file(self, username):
+    def delete_file_IO(self, username):
         """
         Delete the target file from server storage
         """
@@ -321,8 +315,7 @@ class UserManagement:
         except requests.exceptions.RequestException as e:
             print(f"[ERROR] Network error: {e}.")
             return None
-    
-    def share_file(self, username):
+    def share_file_IO(self, username):
         """
         Fetch all users available and allow current user to choose those to share with
         Then send information to server
@@ -395,7 +388,7 @@ class UserManagement:
             except IndexError:
                 print("[ERROR] Please input a valid user index")
                 continue
-    def download_file(self, username):
+    def download_file_IO(self, username):
         """
         Download an existing file from the server to a specific directory.
         """
@@ -421,13 +414,12 @@ class UserManagement:
             except requests.exceptions.RequestException as e:
                 print(f"[ERROR] Network error: {e}.")
                 return None
-        
-    def user_read_storage(self, username):
+    def view_file_IO(self, username):
         """
         Fetch all file names in the storages that this client can read.
         """
         try:
-            response = requests.post(f"{self.server_url}/view_files", json={"username": username})
+            response = requests.post(f"{self.server_url}/view_file", json={"username": username})
 
             #Print out existing files with id
             if response.status_code == 200:
@@ -436,7 +428,6 @@ class UserManagement:
                 print("[ERROR] Server error.")
         except requests.exceptions.RequestException as e:
             print(f"[ERROR] Network error: {e}.")
-    
     
     '''
 Request Examples of File Manager
