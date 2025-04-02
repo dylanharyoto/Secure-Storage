@@ -187,8 +187,6 @@ class User_Iuput_Output:
 
                 try:
                     encrypted_combined_key, recover_key = AES_encrypt(new_password1, aes_plaintext)
-
-
                     if response.status_code == 200:
                         flag_password2 = True
                         print(f"[STATUS] Email '{username}' registered successfully.")
