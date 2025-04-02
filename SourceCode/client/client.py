@@ -17,14 +17,14 @@ class Client:
             print("4. Exit")
             choice = input("Enter your choice:\n> ").strip()
             if choice == "1":
-                client_aes = self.user_management.register_user_IO()
-                if client_aes:
-                    print(f"[INFO] Client AES key generated: {client_aes}")
+                status, recover_key, secret_key = self.user_management.register_user_IO()
+                if status:
+                    print(f"[INFO] Registration sucessful.")
             elif choice == "2":
-                status = self.user_management.login_user_IO()
-                if status[0]:
+                status, username, password = self.user_management.login_user_IO()
+                if status:
                     print("[INFO] Login successful.")
-                    self.session(status[1], status[2])
+                    self.session(username, password)
             elif choice == "3":
                 status = self.user_management.reset_password_IO()
                 if status:

@@ -11,18 +11,14 @@ from Crypto.Cipher import PKCS1_OAEP
 def AES_encrypt(password):
     # Generate random aeskey
     aes_key = get_random_bytes(32) 
-
     # Derive salt from password and generate password hash 
     salt = hmac.new(password, password, hashlib.sha512).digest()[:16]
     password_hash = PBKDF2(password, salt, dkLen=32, count=100000)
-
     # Encrypt the key using password hash
     combined_key = b"true" + aes_key # Add validation tag
     cipher_key = AES.new(password_hash, AES.MODE_CBC)
-    key_iv = cipher_key.iv
-    encrypted_aes_key = cipher_key.encrypt(pad(combined_key, AES.block_size))
-    encrypted_combined_key = encrypted_aes_key + key_iv
-    return encrypted_combined_key, password_hash
+    encrypted_aes_key = cipher_key.encrypt(pad(combined_key, AES.block_size)) + cipher_key.iv
+    return encrypted_aes_key, password_hash
 # Example Usage
 #encrypted_combined_key, recover_key = AES_encrypt(b"correctpassword")
 

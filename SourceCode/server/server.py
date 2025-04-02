@@ -45,14 +45,14 @@ def register():
     data = request.json
     username = data.get('username')
     password = data.get('password')
-    user_aes = data.get('aes')
-    user_rsa = data.get('rsa')
+    encrypted_aes_key = data.get('encrypted_aes_key')
+    public_key = data.get('public_key')
     db = get_db()
     cursor = db.cursor()
     hashed_password = hash_password(password)
     cursor.execute(
-        "INSERT INTO users (username, password, key, pk) VALUES (?, ?, ?, ?)",
-        (username, hashed_password, user_aes, user_rsa)
+        "INSERT INTO users (username, password, encrypted_aes_key, public_key) VALUES (?, ?, ?, ?)",
+        (username, hashed_password, encrypted_aes_key, public_key)
     )
     db.commit()
     return jsonify({"message": "Registered Successfully"}), 200
@@ -98,8 +98,8 @@ def view_files():
         return jsonify({"error": str(e)}), 403
 
 # Endpoint: Upload a file
-@app.route('/upload', methods=['POST'])
-def upload():
+@app.route('/upload_file', methods=['POST'])
+def upload_file():
     username = request.form.get('username')
     file = request.files.get('file')
     if not username or not file:
@@ -110,8 +110,8 @@ def upload():
 
 
 # Endpoint: Edit a file (only if owned by the requester)
-@app.route('/edit', methods=['POST'])
-def edit():
+@app.route('/edit_file', methods=['POST'])
+def edit_file():
     username = request.json.get('username')
     file_id = request.json.get('file_id')
     new_content = request.json.get('content')
@@ -122,7 +122,7 @@ def edit():
         return jsonify({"error": str(e)}), 403
 
 # Endpoint: Delete a file (only if owned by the requester)
-@app.route('/delete', methods=['POST'])
+@app.route('/delete_file', methods=['POST'])
 def delete():
     username = request.json.get('username')
     file_id = request.json.get('file_id')
@@ -133,8 +133,8 @@ def delete():
         return jsonify({"error": str(e)}), 403
 
 # Endpoint: Share a file
-@app.route('/share', methods=['POST'])
-def share():
+@app.route('/share_file', methods=['POST'])
+def share_file():
     """
     Expected JSON payload:
     {
@@ -171,7 +171,7 @@ def view_files():
 
 # Endpoint: Get a file's content
 
-@app.route('/get', methods=['POST'])
+@app.route('/get_file', methods=['POST'])
 def get_file():
     username = request.json.get('username')
     file_id = request.json.get('file_id')
@@ -187,8 +187,8 @@ def get_file():
 
 
 # Endpoint: Require AES key
-@app.route('/require_aes', methods=['POST'])
-def require_aes():
+@app.route('/get_aes', methods=['POST'])
+def get_aes():
     username = request.form.get('username')
     user_aes = file_manager.get_user_aes(username)
     if not user_aes:

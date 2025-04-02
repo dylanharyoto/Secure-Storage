@@ -9,12 +9,12 @@ class UserManagement:
 
     def register_user_IO(self):
         flag_username, flag_password1, flag_password2 = False, False, False
-        username, password1, password2 = None, None, None
+        username, password1, password2, encrypted_aes_key, recovery_key, secret_key, public_key = None, None, None, None, None, None, None
         while not (flag_username and flag_password1 and flag_password2):
             if not flag_username:
                 username = input('Enter your email address (or type "q" to EXIT):\n> ').strip()
                 if username == "q":
-                    return None
+                    return False, None, None
                 if not check_username_regex(username):
                     print('[ERROR] Invalid email format.')
                     continue
@@ -32,7 +32,7 @@ class UserManagement:
             elif not flag_password1:
                 password1 = input('Enter a password with at least 8 characters (or type "q" to EXIT, "b" to BACK):\n> ').strip()
                 if password1 == "q":
-                    return None
+                    return False, None, None
                 if password1 == "b":
                     flag_username = False
                     continue
@@ -43,7 +43,7 @@ class UserManagement:
             elif not flag_password2:
                 password2 = input('Confirm your password (or type "q" to EXIT, "b" to BACK):\n> ').strip()
                 if password2 == "q":
-                    return None
+                    return False, None, None
                 if password2 == "b":
                     flag_password1 = False
                     continue
@@ -51,30 +51,29 @@ class UserManagement:
                     print("[ERROR] Passwords do not match.")
                     continue
                 try:
-                    encrypted_combined_key, recover_key = AES_encrypt(password1)
-                    sk, pk = generate_rsa_keys()
-                    response = requests.post(f"{self.server_url}/register", json={"username": username, "password": password1, 
-                                                                                  "aes": encrypted_combined_key, "rsa": pk})
+                    encrypted_aes_key, recovery_key = AES_encrypt(password1)
+                    secret_key, public_key = generate_rsa_keys()
+                    response = requests.post(f"{self.server_url}/register", json={"username": username, "password": password1, "encrypted_aes_key": encrypted_aes_key, "public_key": public_key})
                     if response.status_code == 200:
                         flag_password2 = True
                         print(f"[STATUS] Email '{username}' registered successfully.")
-                        return recover_key, sk
+                        flag_password2 = True
                     else:
                         print("[ERROR] Server error.")
-                        return False
+                        return False, None, None
                 except requests.exceptions.RequestException as e:
                     print(f"[ERROR] Network error: {e}.")
-                    return False
-        return True
+                    return False, None, None
+        return True, recovery_key, secret_key
 
     def login_user_IO(self):
         flag_username, flag_password = False, False
-        username = None
+        username, password = None, None
         while not (flag_username and flag_password):
             if not flag_username:
                 username = input('Enter your email address (or type "q" to EXIT):\n> ').strip()
                 if username == "q":
-                    return False
+                    return False, None, None
                 if not check_username_regex(username):
                     print('[ERROR] Invalid email format.')
                     continue
@@ -86,14 +85,14 @@ class UserManagement:
                         flag_username = True
                     else:
                         print("[ERROR] Server error.")
-                        return False
+                        return False, None, None
                 except requests.exceptions.RequestException as e:
                     print(f"[ERROR] Network error: {e}.")
-                    return False
+                    return False, None, None
             elif not flag_password:
                 password = input('Enter your password (or type "q" to EXIT, "b" to BACK):\n> ').strip()
                 if password == "q":
-                    return False
+                    return False, None, None
                 if password == "b":
                     flag_username = False
                     break
@@ -108,10 +107,10 @@ class UserManagement:
                         print("[ERROR] Incorrect password.")
                     else:
                         print("[ERROR] Server error.")
-                        return False
+                        return False, None, None
                 except requests.exceptions.RequestException as e:
                     print(f"[ERROR] Network error: {e}.")
-                    return False
+                    return False, None, None
         return True, username, password
 
     def reset_password_IO(self):
@@ -193,8 +192,6 @@ class UserManagement:
                     return False
         return True
     
-    
-    
     def upload_file(self, username, password):
         """
         Encrypt and upload a file to the server
@@ -210,7 +207,7 @@ class UserManagement:
             # Get user's encrypted aes key from server
             data = {'username': username}
             try:
-                response = requests.post(f"{self.server_url}/require_aes", data=data)
+                response = requests.post(f"{self.server_url}/get_aes", data=data)
             except requests.exceptions.RequestException as e:
                 print(f"[ERROR] Network error: {e}.")
                 return None
@@ -222,7 +219,7 @@ class UserManagement:
             with open(encry_file_path, 'rb') as file:
                 files = {'file': file}
             try:
-                    response = requests.post(f"{self.server_url}/upload", files=files, data=data)
+                    response = requests.post(f"{self.server_url}/upload_file", files=files, data=data)
                     if response.status_code == 400:
                         print(f"[ERROR] {response.json()["error"]}")
                         return None
@@ -239,8 +236,7 @@ class UserManagement:
         Update the target file by sending new content to server
         """
         # file flag tests if user has already input a target file, and path flag tests if user finish process
-        path_flag = False
-        file_flag = False
+        path_flag, file_flag = False, False
         file_id = 0
         while not path_flag:
             try:
@@ -269,7 +265,7 @@ class UserManagement:
                     # Get user's encrypted aes key from server
                     data = {'username': username}
                     try:
-                        response = requests.post(f"{self.server_url}/require_aes", data=data)
+                        response = requests.post(f"{self.server_url}/get_aes", data=data)
                         if response.status_code == 400:
                             print(f"[ERROR] {response.json()["error"]}")
                             return None
@@ -286,7 +282,7 @@ class UserManagement:
 
                     # Request for the file content from server
                     data = {'username': username, 'file_id': file_id, 'content': new_content}
-                    response = requests.post(f"{self.server_url}/edit", json=data)
+                    response = requests.post(f"{self.server_url}/edit_file", json=data)
                     if response.status_code == 403:
                         print(f"[ERROR] {response.json()["error"]}")
                         return None
@@ -307,12 +303,12 @@ class UserManagement:
         """
         try:
             # Query user for the file id of file to be deleted
-            choice = input("Please input the file ID for the file to be edited (or type \"q\" to EXIT):\n> ")
+            choice = input("Please input the file ID for the file to be deleted (or type \"q\" to EXIT):\n> ")
             if choice == 'q':
                 return None
             file_id = int(choice)
             data = {'username': username, 'file_id': file_id}
-            response = requests.post(f"{self.server_url}/delete", json=data)
+            response = requests.post(f"{self.server_url}/delete_file", json=data)
 
             if response.status_code == 403:
                 print(f"[ERROR] {response.json()["error"]}")
@@ -326,14 +322,13 @@ class UserManagement:
             print(f"[ERROR] Network error: {e}.")
             return None
     
-    def share_users(self, username):
+    def share_file(self, username):
         """
         Fetch all users available and allow current user to choose those to share with
         Then send information to server
         """
         # file flag tests if user has already input a target file, and user flag tests if user finish process
-        user_flag = False
-        file_flag = False
+        user_flag, file_flag = False, False
         file_id = 0
         user_names = []
 
@@ -386,9 +381,7 @@ class UserManagement:
             if choice == "p":
                 try:
                     data = {'username': username, 'file_id': file_id, 'users': user_names}
-                    response = requests.post(f"{self.server_url}/share", json=data)
-
-                    ####ERROR
+                    response = requests.post(f"{self.server_url}/share_file", json=data)
                     
                     return response.json()
                 except requests.exceptions.RequestException as e:
@@ -417,7 +410,7 @@ class UserManagement:
 
                 # Request for the file content from server
                 data = {'username': username, 'file_id': file_id}
-                response = requests.post(f"{self.server_url}/get", json=data)
+                response = requests.post(f"{self.server_url}/get_file", json=data)
                 if response.status_code == 403:
                         print(f"[ERROR] {response.json()["error"]}")
                         return None
@@ -456,27 +449,27 @@ def upload_file(username, file_path):
     with open(file_path, 'rb') as file:
         files = {'file': file}
         data = {'username': username}
-        response = requests.post(f"{SERVER_URL}/upload", files=files, data=data)
+        response = requests.post(f"{SERVER_URL}/upload_file", files=files, data=data)
     return response.json()
 
 def edit_file(username, file_id, new_content):
     data = {'username': username, 'file_id': file_id, 'content': new_content}
-    response = requests.post(f"{SERVER_URL}/edit", json=data)
+    response = requests.post(f"{SERVER_URL}/edit_file", json=data)
     return response.json()
 
 def delete_file(username, file_id):
     data = {'username': username, 'file_id': file_id}
-    response = requests.post(f"{SERVER_URL}/delete", json=data)
+    response = requests.post(f"{SERVER_URL}/delete_file", json=data)
     return response.json()
 
 def share_file(username, file_id, users):
     data = {'username': username, 'file_id': file_id, 'users': users}
-    response = requests.post(f"{SERVER_URL}/share", json=data)
+    response = requests.post(f"{SERVER_URL}/share_file", json=data)
     return response.json()
 
 def get_file(username, file_id):
     data = {'username': username, 'file_id': file_id}
-    response = requests.post(f"{SERVER_URL}/get", json=data)
+    response = requests.post(f"{SERVER_URL}/get_file", json=data)
     return response.json()
 
 

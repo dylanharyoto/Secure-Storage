@@ -12,8 +12,8 @@ def init_database(db_file_name, table_name):
             CREATE TABLE IF NOT EXISTS {table_name} (
                 username TEXT PRIMARY KEY,
                 password TEXT NOT NULL, 
-                key TEXT NOT NULL
-                pk TEXT NOT NULL
+                encrypted_aes_key TEXT NOT NULL,
+                public_key TEXT NOT NULL
             )
         ''')
         conn.commit()
