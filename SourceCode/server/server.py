@@ -76,12 +76,13 @@ def reset_password():
     data = request.json
     username = data.get('username')
     new_password = data.get('new_password')
+    new_aes = data.get('new_aes')
     db = get_db()
     cursor = db.cursor()
     new_hashed_password = hash_password(new_password)
     cursor.execute(
-        "UPDATE users SET password = ? WHERE username = ?",
-        (new_hashed_password, username)
+        "UPDATE users SET password = ?, key = ? WHERE username = ?",
+        (new_hashed_password, new_aes, username)
     )
     db.commit()
     return jsonify({"message": "password reset"}), 200
@@ -141,7 +142,7 @@ def share():
         return jsonify({"error": "Missing username, file_id, or share_info"}), 400
     try:
         new_ids = file_manager.share_file(username, file_id, share_info)
-        return jsonify({"shared_file_ids": new_ids})
+        return jsonify({"shared_file_ids": new_ids}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 403
 
@@ -153,7 +154,7 @@ def view_files():
         return jsonify({"error": "Missing username"}), 400
     try:
         files = file_manager.view_files(username)
-        return jsonify({"files": files})
+        return jsonify({"files": files}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 403
 
@@ -170,12 +171,21 @@ def get_file():
         return jsonify({"content": content.decode(), "access": access})
     except Exception as e:
         return jsonify({"error": str(e)}), 403
+    
+# Endpoint: View all files of a user
+@app.route('/get_users', methods=['POST'])
+def get_users():
+    try:
+        users_names = ','.join(file_manager.get_user())
+        return jsonify({"message": users_names})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 403
 
 
 # Endpoint: Require AES key
 @app.route('/require_aes', methods=['POST'])
 def require_aes():
-    username = request.form.get('username')
+    username = request.json.get('username')
     user_aes = file_manager.get_user_aes(username)
     if not user_aes:
         return jsonify({"error": f"AES key for {username} not found"}), 400
@@ -184,7 +194,7 @@ def require_aes():
 # Endpoint: Require RSA key
 @app.route('/require_rsa', methods=['POST'])
 def require_rsa():
-    username = request.form.get('username')
+    username = request.json.get('username')
     user_rsa = file_manager.get_user_aes(username)
     if not user_rsa:
         return jsonify({"error": f"RSA key for {username} not found"}), 400
