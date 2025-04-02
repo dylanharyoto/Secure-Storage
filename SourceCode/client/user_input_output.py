@@ -1,11 +1,11 @@
 import requests
 import os
-from SourceCode.shared.utils import check_username_regex, check_password_regex, generate_aes, hash_password, split_aes
+from SourceCode.shared.utils import check_username_regex, check_password_regex
 from encryption import AES_encrypt, generate_rsa_keys, encrypt_file, decrypt_file, encrypt_file_for_sharing, decrypt_shared_file, recover_key_check, password_hashA
 
 class User_Iuput_Output:
     def __init__(self):
-        self.server_url = "http://localhost:5200"  # Adjust if the server runs on a different host/port
+        self.server_url = "http://localhost:5080"  # Adjust if the server runs on a different host/port
 
     def register_user_IO(self):
         flag_username, flag_password1, flag_password2 = False, False, False
@@ -75,7 +75,7 @@ class User_Iuput_Output:
             if not flag_username:
                 username = input('Enter your email address (or type "q" to EXIT):\n> ').strip()
                 if username == "q":
-                    return False
+                    return False, None, None
                 if not check_username_regex(username):
                     print('[ERROR] Invalid email format.')
                     continue
@@ -87,14 +87,14 @@ class User_Iuput_Output:
                         flag_username = True
                     else:
                         print("[ERROR] Server error.")
-                        return False
+                        return False, None, None
                 except requests.exceptions.RequestException as e:
                     print(f"[ERROR] Network error: {e}.")
-                    return False
+                    return False, None, None
             elif not flag_password:
                 password = input('Enter your password (or type "q" to EXIT, "b" to BACK):\n> ').strip()
                 if password == "q":
-                    return False
+                    return False, None, None
                 if password == "b":
                     flag_username = False
                     break
@@ -110,10 +110,10 @@ class User_Iuput_Output:
                         print("[ERROR] Incorrect password.")
                     else:
                         print("[ERROR] Server error.")
-                        return False
+                        return False, None, None
                 except requests.exceptions.RequestException as e:
                     print(f"[ERROR] Network error: {e}.")
-                    return False
+                    return False, None, None
         return True, username, password
 
     def reset_password_IO(self):
@@ -160,7 +160,8 @@ class User_Iuput_Output:
                             print("[ERROR] Validation failed. Recover key is incorrect.")
                             continue
                     elif response.status_code == 400:
-                        print(f"[ERROR] {response.json()["error"]}")
+                        error = response.json()["error"]
+                        print(f"[ERROR] {error}")
                         continue
                     else:
                         print("[ERROR] Server error")
@@ -235,7 +236,8 @@ class User_Iuput_Output:
             try:
                 response = requests.post(f"{self.server_url}/upload", files=files, data={'username': username})
                 if response.status_code == 400:
-                    print(f"[ERROR] {response.json()["error"]}")
+                    error = response.json()["error"]
+                    print(f"[ERROR] {error}")
                     return None
                 # Remove the temp file
                 os.remove(encry_file_path)
@@ -281,7 +283,8 @@ class User_Iuput_Output:
                     try:
                         response = requests.post(f"{self.server_url}/require_aes", json={'username': username})
                         if response.status_code == 400:
-                            print(f"[ERROR] {response.json()["error"]}")
+                            error = response.json()["error"]
+                            print(f"[ERROR] {error}")
                             return None
                     except requests.exceptions.RequestException as e:
                         print(f"[ERROR] Network error: {e}.")
@@ -294,7 +297,8 @@ class User_Iuput_Output:
                     data = {'username': username, 'file_id': file_id, 'content': new_content}
                     response = requests.post(f"{self.server_url}/edit", json=data)
                     if response.status_code == 403:
-                        print(f"[ERROR] {response.json()["error"]}")
+                        error = response.json()["error"]
+                        print(f"[ERROR] {error}")
                         return None
                     # Remove the temp file
                     os.remove(encry_file_path)
@@ -321,7 +325,8 @@ class User_Iuput_Output:
             response = requests.post(f"{self.server_url}/delete", json=data)
 
             if response.status_code == 403:
-                print(f"[ERROR] {response.json()["error"]}")
+                error = response.json()["error"]
+                print(f"[ERROR] {error}")
                 return None
             return response.json()
             
@@ -348,7 +353,8 @@ class User_Iuput_Output:
             response = requests.post(f"{self.server_url}/get_users")
 
             if response.status_code != 200:
-                print(f"[ERROR] {response.json()["error"]}")
+                error = response.json()["error"]
+                print(f"[ERROR] {error}")
                 return None
             message = response.json()["message"]
             all_users = message.split(',').sort()
@@ -403,7 +409,8 @@ class User_Iuput_Output:
                     response = requests.post(f"{self.server_url}/get", json={'username': username, 'file_id': file_id})
                     response_data = response.json()
                     if response.status_code > 399:
-                        print(f"[ERROR] {response_data["error"]}")
+                        error = response_data["error"]
+                        print(f"[ERROR] {error}")
                         return None
                     if response_data['access'] == 'shared':
                         print("[ERROR] File shared from others can not be shared again.")
@@ -462,7 +469,8 @@ class User_Iuput_Output:
                 data = {'username': username, 'file_id': file_id}
                 response = requests.post(f"{self.server_url}/get", json=data)
                 if response.status_code == 403:
-                        print(f"[ERROR] {response.json()["error"]}")
+                        error = response.json()["error"]
+                        print(f"[ERROR] {error}")
                         return None
                 response_data = response.json()
                 if response_data['access'] == 'shared':
@@ -477,7 +485,8 @@ class User_Iuput_Output:
                 else:
                     response = requests.post(f"{self.server_url}/require_aes", json={'username': username})
                     if response.status_code == 400:
-                        print(f"[ERROR] {response.json()["error"]}")
+                        error = response.json()["error"]
+                        print(f"[ERROR] {error}")
                         return None
                     decrypt_file(password, response.json()['aes'], response_data['content'], store_path)
                 return response.json()
@@ -500,6 +509,7 @@ class User_Iuput_Output:
                 files = response.json()['files']
                 [print(f"{i+1}: {files[i]}") for i in range(len(files))]
             else:
-                print(f"[ERROR] {response.json()["error"]}")
+                error = response.json()["error"]
+                print(f"[ERROR] {error}")
         except requests.exceptions.RequestException as e:
             print(f"[ERROR] Network error: {e}.")

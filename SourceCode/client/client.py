@@ -21,10 +21,10 @@ class Client:
                 if client_aes:
                     print(f"[INFO] Client AES key generated: {client_aes}")
             elif choice == "2":
-                status = self.user_input_output.login_user_IO()
-                if status[0]:
+                status, username, password = self.user_input_output.login_user_IO()
+                if status:
                     print("[INFO] Login successful.")
-                    self.session(status[1], status[2])
+                    self.session(username, password)
             elif choice == "3":
                 status = self.user_input_output.reset_password_IO()
                 if status:
@@ -68,4 +68,3 @@ class Client:
 
 if __name__ == "__main__":
     client = Client()
-    client.run()

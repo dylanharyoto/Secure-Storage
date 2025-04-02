@@ -9,8 +9,11 @@ from Crypto.Cipher import PKCS1_OAEP
 import bcrypt
 import base64
 
+#.encode('utf-8')
+
 # AES and RSA generation
 def AES_encrypt(password):
+    password = password.encode('utf-8')
     # Generate random aeskey
     aes_key = get_random_bytes(32) 
 
@@ -40,6 +43,7 @@ def generate_rsa_keys():
 ################################################################################################
 # AES Encryption
 def encrypt_file(password, encrypted_combined_key, input_file):
+    password = password.encode('utf-8')
     key_iv = encrypted_combined_key[48:]
     encrypted_aes_key = encrypted_combined_key[:48]
     # Generate the password key and decrypt the aeskey
@@ -64,6 +68,7 @@ def encrypt_file(password, encrypted_combined_key, input_file):
 # Decryption
 def decrypt_file(password, encrypted_combined_key, file_data, output_file):
 
+    password = password.encode('utf-8')
     # Read IV and ciphertext
     iv = file_data[:16]
     ciphertext = file_data[16:]
@@ -161,6 +166,7 @@ def decrypt_shared_file(private_key, data, output_file):
 #decrypt_shared_file(private_key, encrypted data, "decrypted.txt")
 
 def password_hashA(password):
+    password = password.encode('utf-8')
     # Derive salt from password and generate password hash 
     hash = hmac.new(password, password, hashlib.sha512).digest()
     salt = hmac.new(hash, hash, hashlib.sha512).digest()[:16]
