@@ -6,9 +6,14 @@ import hmac
 import hashlib
 from Crypto.PublicKey import RSA
 from Crypto.Cipher import PKCS1_OAEP
+import bcrypt
+import base64
+
+#.encode('utf-8')
 
 # AES and RSA generation
 def AES_encrypt(password):
+    password = password.encode('utf-8')
     # Generate random aeskey
     aes_key = get_random_bytes(32) 
     # Derive salt from password and generate password hash 
@@ -33,7 +38,8 @@ def generate_rsa_keys():
 
 ################################################################################################
 # AES Encryption
-def encrypt_file(password, encrypted_combined_key, input_file, output_file):
+def encrypt_file(password, encrypted_combined_key, input_file):
+    password = password.encode('utf-8')
     key_iv = encrypted_combined_key[48:]
     encrypted_aes_key = encrypted_combined_key[:48]
     # Generate the password key and decrypt the aeskey
@@ -50,19 +56,15 @@ def encrypt_file(password, encrypted_combined_key, input_file, output_file):
         plaintext = f.read()
     ciphertext = cipher.encrypt(pad(plaintext, AES.block_size))
 
-    # Store IV and ciphertext in the output file
-    with open(output_file, "wb") as f:
-        f.write(iv + ciphertext)
-
     print("File encrypted successfully!")
+    return (iv + ciphertext)
 # Example Usage
-#encrypt_file(b"correctpassword", encrypted_combined_key, "example.txt", "encrypted.bin")
+#encrypt_file(b"correctpassword", encrypted_combined_key, "example.txt")
 
 # Decryption
-def decrypt_file(password, encrypted_combined_key, input_file, output_file):
-    with open(input_file, "rb") as f:
-        file_data = f.read()
+def decrypt_file(password, encrypted_combined_key, file_data, output_file):
 
+    password = password.encode('utf-8')
     # Read IV and ciphertext
     iv = file_data[:16]
     ciphertext = file_data[16:]
@@ -94,7 +96,7 @@ def decrypt_file(password, encrypted_combined_key, input_file, output_file):
     print(f"Decryption successful! File saved as: {output_file}")
 # Example Usage
 #try:
-#    decrypt_file(b"correctpassword", encrypted_combined_key, "encrypted.bin", "decrypted.txt")
+#    decrypt_file(b"correctpassword", encrypted_combined_key, encrypted content, "decrypted.txt")
 #except ValueError as e:
 #    print(e)
 
@@ -116,13 +118,11 @@ def recover_key_check(recover_key, encrypted_combined_key):
 ################################################################################################
 # RSA encryption
 # Encrypts a file with AES and encrypts the AES key with receiver's public key
-def encrypt_file_for_sharing(public_key, input_file, output_file):  
+def encrypt_file_for_sharing(public_key, plaintext):  
     # Encrypt the file using AES-CBC
     aes_key = get_random_bytes(32)
     iv = get_random_bytes(16)
     cipher = AES.new(aes_key, AES.MODE_CBC, iv)
-    with open(input_file, "rb") as f:
-        plaintext = f.read()
     ciphertext = cipher.encrypt(pad(plaintext, AES.block_size))
 
     # Encrypt the AES key with receiver's public key
@@ -130,20 +130,13 @@ def encrypt_file_for_sharing(public_key, input_file, output_file):
     cipher_rsa = PKCS1_OAEP.new(rsa_key)
     encrypted_aes_key = cipher_rsa.encrypt(aes_key)
 
-    # Save encrypted data
-    with open(output_file, "wb") as f:
-        f.write(len(encrypted_aes_key).to_bytes(2, "big") + encrypted_aes_key + iv + ciphertext)
+    return len(encrypted_aes_key).to_bytes(2, "big") + encrypted_aes_key + iv + ciphertext
 
-    print(f"File encrypted and saved as {output_file}")
 # Example Usage
-#encrypt_file_for_sharing(public_key, "example.txt", "encrypted.bin")
+#encrypt_file_for_sharing(public_key, plaintext)
 
 # Decrypts an AES-encrypted file using the receiver's private key
-def decrypt_shared_file(private_key, input_file, output_file):
-    # Extract the file data
-    with open(input_file, "rb") as f:
-        data = f.read()
-
+def decrypt_shared_file(private_key, data, output_file):
     key_length = int.from_bytes(data[:2], "big")
     break_point1 = key_length + 2
     encrypted_aes_key = data[2:break_point1]
@@ -166,4 +159,16 @@ def decrypt_shared_file(private_key, input_file, output_file):
 
     print(f"File decrypted and saved as {output_file}")
 # Example Usage
-#decrypt_shared_file(private_key, "encrypted.bin", "decrypted.txt")
+#decrypt_shared_file(private_key, encrypted data, "decrypted.txt")
+
+def password_hashA(password):
+    password = password.encode('utf-8')
+    # Derive salt from password and generate password hash 
+    hash = hmac.new(password, password, hashlib.sha512).digest()
+    salt = hmac.new(hash, hash, hashlib.sha512).digest()[:16]
+    b64_salt = base64.b64encode(salt).decode('utf-8')
+    b64_salt = b64_salt.replace('+', '.').replace('=', '')
+    bcrypt_salt = f"$2b${12}${b64_salt}".encode('utf-8')
+    password_hash = bcrypt.hashpw(password, bcrypt_salt)
+    return password_hash
+
