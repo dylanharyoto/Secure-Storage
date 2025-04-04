@@ -3,6 +3,12 @@ import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 from SourceCode.Client import UserManagement
 
+
+log_schema = {
+    "log_id": "INTEGER PRIMARY KEY AUTOINCREMENT",
+    "timestamp": "TEXT NOT NULL",
+    "message": "TEXT"
+}
 def run():
     while True:
         print("\nUser Management Menu:")

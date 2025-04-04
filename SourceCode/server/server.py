@@ -13,8 +13,13 @@ file_manager = FileManager()
 # Initialize the database before the app starts
 db_file_name = app.config['DATABASE']
 os.makedirs(os.path.dirname(db_file_name), exist_ok=True)
-Utils.init_database(db_file_name, "Users")
-Utils.init_database()
+user_schema = {
+    "username": "TEXT PRIMARY KEY",
+    "password": "TEXT NOT NULL",
+    "encrypted_aes_key": "TEXT NOT NULL",
+    "public_key": "TEXT NOT NULL"
+}
+Utils.init_database(db_file_name, "Users", user_schema)
 
 def get_db():
     """Get a database connection for the current request."""
