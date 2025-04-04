@@ -339,7 +339,8 @@ class UserManagement:
             print(f"[ERROR] Network error: {error}.")
             return False
         return True
-    def delete_file_IO(self, username):
+    @staticmethod
+    def delete_file_IO(username):
         """
         Delete the target file from server storage
         """
@@ -369,176 +370,191 @@ class UserManagement:
             print(f"[ERROR] Network error: {e}.")
             return False
         return True
-    def share_file_IO(self, username):
+    @staticmethod
+    def share_file_IO(username):
         """
         Fetch all users available and allow current user to choose those to share with
         Then send information to server
         """
-        # file flag tests if user has already input a target file, and user flag tests if user finish process
-        user_flag, file_flag = False, False
-        file_id = 0
-        user_names = []
-
-        # Fetch all existing users from server
+        file_id_flag = False
+        selected_usernames_id_flag = False
+        file_id = None
+        selected_usernames_id = None
+        selected_usernames = []
+        available_usernames = []
         try:
             response = requests.post(f"{SERVER_URL}/get_users")
-
-            if response.status_code != 200:
+            if response.status_code == 200:
+                message = response.json()["message"]
+                available_usernames = message.split(',').sort()
+                available_usernames.remove(username)
+            elif response.status_code == 403:
                 error = response.json()["error"]
                 print(f"[ERROR] {error}")
+                return False
+            else:
+                print("[ERROR] Server error.")
+                return False  
+        except requests.exceptions.RequestException as error:
+            print(f"[ERROR] Network error: {error}.")
+            return False
+        while not (file_id_flag and selected_usernames_id_flag):
+            if not file_id_flag:
+                file_id = input("Please input the file ID for the file to be shared (or type \"q\" to EXIT):\n> ")
+                if file_id == "q":
+                    return False
+                if not Utils.check_file_id_regex(file_id):
+                    print('[ERROR] Invalid file ID format.')
+                    continue
+                file_id_flag = True
+            if not selected_usernames_id_flag:
+                if len(available_usernames) < 1:
+                    selected_usernames_id_flag = True
+                    continue
+                print("Added users:")
+                for i in range(len(selected_usernames)):
+                    print(f"{i + 1}. {selected_usernames[i]}")
+                print("Other available users:")
+                for i in range(len(available_usernames)):
+                    print(f"{i + 1}. {available_usernames[i]}")
+                selected_usernames_id = input("Please input the index of the user to share with (or type \"q\" to EXIT, \"b\" to BACK):\n> ")            
+                # use \"-\" with the index (e.g. -1) to remove (to be implemented)
+                if selected_usernames_id == "q":
+                    return False
+                if selected_usernames_id == "b":
+                    available_usernames.append(selected_usernames)
+                    selected_usernames = []
+                    selected_usernames_id_flag = False
+                    continue
+                if selected_usernames_id == "c":
+                    selected_usernames_id_flag = True
+                    continue
+                if not selected_usernames_id.isdigit():
+                    print("[ERROR] Input must be a digit.")
+                    continue
+                if int(selected_usernames_id) > len(selected_usernames) or int(selected_usernames_id) < 1:
+                    print("[ERROR] Index selected is out of range.")
+                    continue
+                selected_usernames.append(available_usernames.pop(int(selected_usernames_id) - 1))
+        data = {"username": username, "file_id": file_id, "share_info": {}}
+        try:
+            response = requests.post(f"{SERVER_URL}/share_file", json={'username': username, 'file_id': file_id})
+            response_data = response.json()
+            if response.status_code == 200:
+                shared_file_ids = response_data["shared_file_ids"]
+            elif response.status_code == 403:
+                error = response_data["error"]
+                print(f"[ERROR] {error}")
                 return None
-            message = response.json()["message"]
-            all_users = message.split(',').sort()
-            all_users.remove(username)
+            else: 
+                print("[ERROR] Server error.")
+                return False 
+            # if response_data['access'] == 'shared':
+            #     print("[ERROR] File shared from others can not be shared again.")      
+            ##############################################################
+            # Server return the encrypted file, and all pk for the users #
+            ##############################################################
+            for user in available_usernames:
+                response = requests.post(f"{SERVER_URL}/get_rsa", json={'username': user})
+                user_rsa = response.json()['rsa']
+                data['share_info'][user] = CryptoManager.encrypt_file_for_sharing(user_rsa, response_data['content'])
+            response = requests.post(f"{SERVER_URL}/share", json=data)
+            #return response.json()
         except requests.exceptions.RequestException as e:
             print(f"[ERROR] Network error: {e}.")
-            return None
-        
-        while not user_flag:
-            # Query user for the file id of file to be shared
-            if not file_flag:
-                choice = input("Please input the file ID for the file to be shared (or type \"q\" to EXIT):\n> ")
-                if choice == 'q':
-                    return None
-                try:
-                    file_id = int(choice)
-                except ValueError:
-                    print("[ERROR] Please input a valid integer")
-                    continue
-            file_flag = True
-
-            # list all users available to share
-            print("Other current users available are listed below:")
-            [print(f"{i+1}: {all_users[i]}") for i in range(len(all_users))]
-            if len(user_names)==0:
-                print(f"Added users are: None")
-            else:
-                print(f"Added users are: {','.join(user_names)}")
-
-            # Query user to choose a user to share
-            choice = input("Please input one correspond index of target user to share with,\ntype \"p\" to proceed (or type \"q\" to EXIT, \"b\" to BACK):\n> ")
-            if choice == "q":
-                return None
-            # Re-enter target file
-            if choice == "b":
-                if user_names:
-                    all_users.append(user_names.pop())
-                    all_users = all_users.sort()
-                else:
-                    file_flag = False
-                continue
-            # proceed to send all selected users to server
-            if choice == "p":
-                try:
-
-                    data = {"username": username,
-                            "file_id": file_id,
-                            "share_info": {
-                                }
-                            }
-
-                    response = requests.post(f"{SERVER_URL}/share_file", json={'username': username, 'file_id': file_id})
-                    response_data = response.json()
-                    if response.status_code > 399:
-                        error = response_data["error"]
-                        print(f"[ERROR] {error}")
-                        return None
-                    if response_data['access'] == 'shared':
-                        print("[ERROR] File shared from others can not be shared again.")
-                    
-                    
-                    ##############################################################
-                    # Server return the encrypted file, and all pk for the users #
-                    ##############################################################
-                    for user in all_users:
-                        response = requests.post(f"{SERVER_URL}/require_rsa", json={'username': user})
-                        user_rsa = response.json()['rsa']
-                        data['share_info'][user] = CryptoManager.encrypt_file_for_sharing(user_rsa, response_data['content'])
-
-
-                    response = requests.post(f"{SERVER_URL}/share", json=data)
-                    return response.json()
-                except requests.exceptions.RequestException as e:
-                    print(f"[ERROR] Network error: {e}.")
-                    return None
-            try:
-                user_names.append(all_users[int(choice)])
-            except ValueError:
-                print("[ERROR] Please input a valid integer")
-                continue
-            except IndexError:
-                print("[ERROR] Please input a valid user index")
-                continue
-    def download_file_IO(self, username, password):
+            return False
+        return True
+    @staticmethod
+    def download_file_IO(username, password):
         """
         Download an existing file from the server to a specific directory.
         """
         # Query user for the target file id
-        file_flag = False
-        path_flag = False
-        while not file_flag and not path_flag:
-            try:
-                choice = input("Please input the file ID for the file to be downloaded (or type \"q\" to EXIT):\n> ")
-                if choice == 'q':
+        file_id_flag = False
+        file_path_flag = False
+        secret_key_flag = False
+        file_id = None
+        file_path = None
+        secret_key = None
+        response_data = None
+        while not (file_id_flag and file_path_flag and secret_key_flag):
+            if not (file_id_flag):
+                file_id = input("Please input the file ID for the file to be downloaded (or type \"q\" to EXIT):\n> ")
+                if file_id == "q":
                     return None
-                file_id = int(choice)
-                file_flag = True
-
-                store_path = input("Please input the path of a target directory "
-                "for the file to be downloaded (or type \"q\" to EXIT, \"b\" to BACK):\n> ")
-                if store_path == 'q':
-                    return None
-                if store_path == 'b':
-                    file_flag=False
+                if not Utils.check_file_id_regex(file_id):
+                    print('[ERROR] Invalid file ID format.')
                     continue
-                if not os.path.isdir(store_path):
-                    print("[ERROR] The directory not found or invalid")
-                path_flag = True
-
+                file_id_flag = True
+            if not (file_path_flag):
+                file_path = input("Please input the path of the file to be edited (or type \"q\" to EXIT, \"b\" to BACK):\n> ")
+                if file_path == "q":
+                    return None
+                if file_path == "b":
+                    file_id_flag = False
+                    continue
+                if not os.path.isfile(file_path):
+                    print("[ERROR] Invalid file path or file does not exist.")
+                    continue
                 # Request for the file content from server
                 data = {'username': username, 'file_id': file_id}
-                response = requests.post(f"{SERVER_URL}/get_file", json=data)
-                if response.status_code == 403:
+                try:
+                    response = requests.post(f"{SERVER_URL}/get_file", json=data)
+                    if response.status_code == 200:
+                        response_data = response.json()
+                        print(f"[STATUS] File '{file_id}' fetched successfully.")
+                    elif response.status_code == 403:
                         error = response.json()["error"]
                         print(f"[ERROR] {error}")
-                        return None
-                response_data = response.json()
+                        return False
+                    else:
+                        print("[ERROR] Server error.")
+                        return False
+                except requests.exceptions.RequestException as e:
+                    print(f"[ERROR] Network error: {e}.")
+                    return None
+                file_path_flag = True
+            if not secret_key_flag:
                 if response_data['access'] == 'shared':
-                    sk = input("The selected file is shared by others. "
-                    "Please enter your private key to decrypt (or type \"q\" to EXIT, \"b\" to BACK):\n> ")
-                    if sk == 'q':
-                        return None
-                    elif sk == 'b':
-                        path_flag = False
+                    secret_key = input("Please enter your secret key to decrypt, as the file is shared (or type \"q\" to EXIT, \"b\" to BACK):\n> ")
+                    if secret_key == "q":
+                        return False
+                    elif secret_key == "b":
+                        secret_key_flag = False
                         continue
-                    CryptoManager.decrypt_shared_file(sk, response_data['content'], store_path)
+                    CryptoManager.decrypt_shared_file(secret_key, response_data['content'], file_path)
                 else:
-                    response = requests.post(f"{SERVER_URL}/require_aes", json={'username': username})
-                    if response.status_code == 400:
+                    response = requests.post(f"{SERVER_URL}/get_aes", json={'username': username})
+                    if response.status_code == 200:
+                        print(f"[STATUS] AES for '{username}' fetched successfully.")
+                    elif response.status_code == 400:
                         error = response.json()["error"]
                         print(f"[ERROR] {error}")
-                        return None
-                    CryptoManager.decrypt_file_with_aes(password, response.json()['aes'], response_data['content'], store_path)
-                return response.json()
-            
-            except ValueError:
-                print("[ERROR] Please input a valid integer")
-            except requests.exceptions.RequestException as e:
-                print(f"[ERROR] Network error: {e}.")
-                return None
+                        return False
+                    else:
+                        print("[ERROR] Server error.")
+                        return False
+                    CryptoManager.decrypt_file_with_aes(password, response.json()['aes'], response_data['content'], file_path)
+                secret_key_flag = True
+        #return response.json()
+        return True
+
     def view_file_IO(self, username):
         """
         Fetch all file names in the storages that this client can read.
         """
         try:
-            response = requests.post(f"{SERVER_URL}/view_file", json={"username": username})
-
-            #Print out existing files with id
+            response = requests.post(f"{SERVER_URL}/get_files", json={"username": username})
             if response.status_code == 200:
                 files = response.json()['files']
-                [print(f"{i+1}: {files[i]}") for i in range(len(files))]
-            else:
+                for i in range(len(files)):
+                    print(f"{i + 1}. {files[i]}")
+            elif response.status_code == 403:
                 error = response.json()["error"]
                 print(f"[ERROR] {error}")
+                return False
+            else:
+                print("[ERROR] Server error.")
+                return False
         except requests.exceptions.RequestException as e:
             print(f"[ERROR] Network error: {e}.")

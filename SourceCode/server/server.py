@@ -3,18 +3,18 @@ import sqlite3
 import os
 import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
-from SourceCode.shared.utils import hash_password, init_database, check_password  # Import check_password
-from SourceCode.server.FileManager import FileManager
+from SourceCode.Shared import Utils
+from SourceCode.Server import FileManager
 
 # Initialize Flask app
 app = Flask(__name__)
-app.config['DATABASE'] = os.path.join(os.path.dirname(__file__), "data", "users.db")
+app.config['DATABASE'] = os.path.join(os.path.dirname(__file__), "data", "Users.db")
 file_manager = FileManager()
-
 # Initialize the database before the app starts
 db_file_name = app.config['DATABASE']
 os.makedirs(os.path.dirname(db_file_name), exist_ok=True)
-init_database(db_file_name, "users")
+Utils.init_database(db_file_name, "Users")
+Utils.init_database()
 
 def get_db():
     """Get a database connection for the current request."""
@@ -23,7 +23,7 @@ def get_db():
     return g.db
 
 @app.teardown_appcontext
-def close_db(error):
+def close_db():
     """Close the database connection at the end of each request."""
     if hasattr(g, 'db'):
         g.db.close()
@@ -49,7 +49,7 @@ def register_user():
     public_key = data.get('public_key')
     db = get_db()
     cursor = db.cursor()
-    hashed_password = hash_password(password)
+    hashed_password = Utils.hash_password(password)
     cursor.execute(
         "INSERT INTO users (username, password, encrypted_aes_key, public_key) VALUES (?, ?, ?, ?)",
         (username, hashed_password, encrypted_aes_key, public_key)
@@ -67,7 +67,7 @@ def login_user():
     cursor.execute("SELECT password FROM users WHERE username = ?", (username,))
     result = cursor.fetchone()
     stored_hash = result[0]
-    if check_password(password, stored_hash):
+    if Utils.check_password(password, stored_hash):
         return jsonify({"message": "password matches"}), 200
     return jsonify({"message": "password does not match"}), 201
 
@@ -79,7 +79,7 @@ def reset_password():
     new_aes = data.get('new_aes')
     db = get_db()
     cursor = db.cursor()
-    new_hashed_password = hash_password(new_password)
+    new_hashed_password = Utils.hash_password(new_password)
     cursor.execute(
         "UPDATE users SET password = ?, key = ? WHERE username = ?",
         (new_hashed_password, new_aes, username)
@@ -145,44 +145,44 @@ def share_file():
     except Exception as e:
         return jsonify({"error": str(e)}), 403
 
-# Endpoint: View all files for a user
-@app.route('/view_file', methods=['POST'])
-def view_file():
+# Endpoint: Get all files for a user
+@app.route('/get_files', methods=['POST'])
+def get_files():
     username = request.json.get('username')
     if not username:
         return jsonify({"error": "Missing username"}), 400
     try:
-        files = file_manager.view_file(username)
+        files = file_manager.get_files(username)
         return jsonify({"files": files}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 403
 
-# Endpoint: Get a file's content
-
-@app.route('/get_file', methods=['POST'])
-def get_file():
+# Endpoint: View a file's content
+@app.route('/view_file', methods=['POST'])
+def view_file():
     username = request.json.get('username')
     file_id = request.json.get('file_id')
     if not username or not file_id:
         return jsonify({"error": "Missing username or file_id"}), 400
     try:
-        content, access = file_manager.get_file(username, file_id)
+        content, access = file_manager.view_file(username, file_id)
         # Assuming text content; adjust if binary data (e.g., use base64 encoding)
         return jsonify({"content": content.decode(), "access": access})
     except Exception as e:
         return jsonify({"error": str(e)}), 403
     
-# Endpoint: View all files of a user
+# Endpoint: Get users
 @app.route('/get_users', methods=['POST'])
 def get_users():
+    usernames = None
     try:
-        users_names = ','.join(file_manager.get_user())
-        return jsonify({"message": users_names})
+        usernames = ','.join(file_manager.get_users())
     except Exception as e:
         return jsonify({"error": str(e)}), 403
+    return jsonify({"message": usernames}), 200
 
 
-# Endpoint: Require AES key
+# Endpoint: Get AES key
 @app.route('/get_aes', methods=['POST'])
 def get_aes():
     username = request.json.get('username')
@@ -191,9 +191,9 @@ def get_aes():
         return jsonify({"error": f"AES key for {username} not found"}), 400
     return jsonify({"aes": user_aes}), 200
 
-# Endpoint: Require RSA key
-@app.route('/require_rsa', methods=['POST'])
-def require_rsa():
+# Endpoint: Get RSA key
+@app.route('/get_rsa', methods=['POST'])
+def get_rsa():
     username = request.json.get('username')
     user_rsa = file_manager.get_user_aes(username)
     if not user_rsa:
