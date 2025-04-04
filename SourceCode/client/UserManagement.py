@@ -327,7 +327,7 @@ class UserManagement:
             response = requests.post(f"{SERVER_URL}/edit_file", json=data)
             if response.status_code == 200:
                 os.remove(encrypted_file_path)
-                print(f"[STATUS] File '{username}' uploaded successfully.")
+                print(f"[STATUS] File '{file_id}' uploaded successfully.")
             elif response.status_code == 403:
                 error = response.json()["error"]
                 print(f"[ERROR] {error}")
@@ -343,27 +343,32 @@ class UserManagement:
         """
         Delete the target file from server storage
         """
+        file_id_flag = False
+        file_id = None
+        while not (file_id_flag):
+            file_id = input("Please input the file ID for the file to be deleted (or type \"q\" to EXIT):\n> ")
+            if file_id == "q":
+                return False
+            if not Utils.check_file_id_regex(file_id):
+                print('[ERROR] Invalid file ID format.')
+                continue
+            file_id_flag = True
+        data = {'username': username, 'file_id': file_id}
         try:
-            # Query user for the file id of file to be deleted
-            choice = input("Please input the file ID for the file to be deleted (or type \"q\" to EXIT):\n> ")
-            if choice == 'q':
-                return None
-            file_id = int(choice)
-            data = {'username': username, 'file_id': file_id}
             response = requests.post(f"{SERVER_URL}/delete_file", json=data)
-
-            if response.status_code == 403:
+            if response.status_code == 200:
+                print(f"[STATUS] File '{file_id}' deleted successfully.")
+            elif response.status_code == 403:
                 error = response.json()["error"]
                 print(f"[ERROR] {error}")
-                return None
-            return response.json()
-            
-        except ValueError:
-            print("[ERROR] Please input a valid integer")
-            return None
+                return False 
+            else:
+                print("[ERROR] Server error.")
+                return False       
         except requests.exceptions.RequestException as e:
             print(f"[ERROR] Network error: {e}.")
-            return None
+            return False
+        return True
     def share_file_IO(self, username):
         """
         Fetch all users available and allow current user to choose those to share with
