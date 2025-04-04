@@ -1,10 +1,8 @@
 import sys
 import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
-from SourceCode.client.user_input_output import User_Iuput_Output
+from SourceCode.Client import UserManagement
 
-
-user_management = UserManagement()
 def run():
     while True:
         print("\nUser Management Menu:")
@@ -63,4 +61,5 @@ def session(username, password):
     
 
 if __name__ == "__main__":
+    user_management = UserManagement()
     run()

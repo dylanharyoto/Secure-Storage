@@ -4,7 +4,7 @@ import os
 import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 from SourceCode.shared.utils import hash_password, init_database, check_password  # Import check_password
-from file_manager import FileManager
+from SourceCode.server.FileManager import FileManager
 
 # Initialize Flask app
 app = Flask(__name__)
