@@ -3,14 +3,12 @@ import sqlite3
 import os
 import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
-from SourceCode.Shared import Utils
-from SourceCode.Server import FileManager
+from SourceCode.Shared.Utils import Utils
+from SourceCode.Server.FileManager import FileManager
 
-# Initialize Flask app
 app = Flask(__name__)
 app.config['DATABASE'] = os.path.join(os.path.dirname(__file__), "data", "Users.db")
 file_manager = FileManager()
-# Initialize the database before the app starts
 db_file_name = app.config['DATABASE']
 os.makedirs(os.path.dirname(db_file_name), exist_ok=True)
 user_schema = {

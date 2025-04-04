@@ -1,8 +1,6 @@
 import sqlite3
 import os
-import sys
 import uuid
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
 class FileManager:
     def __init__(self, files_db="files.db", users_db=None):
