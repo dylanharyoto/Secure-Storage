@@ -123,7 +123,7 @@ class FileManager:
         self.conn.commit()
         return new_file_ids
     
-    def get_file(self, username, file_id):
+    def view_file(self, username, file_id):
         """
         Retrieve the file's content and the AES key.
         - If the requester is the owner, the owner's AES key is retrieved.
@@ -135,7 +135,7 @@ class FileManager:
         if not result:
             raise ValueError("File not found")
         owner, content = result
-
+        
         # Check access permission.
         if owner != username:
             self.cursor.execute(
@@ -154,14 +154,14 @@ class FileManager:
         aes_key = user_record[0]
         return content, aes_key
 
-    def get_user(self):
+    def get_users(self):
         """Return a list of all usernames from the users table."""
         self.user_cursor.execute("SELECT username FROM users")
         users = [row[0] for row in self.user_cursor.fetchall()]
         return users
  
 
-    def view_files(self, username):
+    def get_files(self, username):
         """
         Return a list of files for the specified user.
         Each file is represented as a dictionary with keys: file_id, filename, and access.

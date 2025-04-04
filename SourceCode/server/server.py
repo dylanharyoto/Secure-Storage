@@ -3,18 +3,21 @@ import sqlite3
 import os
 import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
-from SourceCode.shared.utils import hash_password, init_database, check_password  # Import check_password
-from file_manager import FileManager
+from SourceCode.Shared.Utils import Utils
+from SourceCode.Server.FileManager import FileManager
 
-# Initialize Flask app
 app = Flask(__name__)
-app.config['DATABASE'] = os.path.join(os.path.dirname(__file__), "data", "users.db")
+app.config['DATABASE'] = os.path.join(os.path.dirname(__file__), "data", "Users.db")
 file_manager = FileManager()
-
-# Initialize the database before the app starts
 db_file_name = app.config['DATABASE']
 os.makedirs(os.path.dirname(db_file_name), exist_ok=True)
-init_database(db_file_name, "users")
+user_schema = {
+    "username": "TEXT PRIMARY KEY",
+    "password": "TEXT NOT NULL",
+    "encrypted_aes_key": "TEXT NOT NULL",
+    "public_key": "TEXT NOT NULL"
+}
+Utils.init_database(db_file_name, "Users", user_schema)
 
 def get_db():
     """Get a database connection for the current request."""
@@ -23,7 +26,7 @@ def get_db():
     return g.db
 
 @app.teardown_appcontext
-def close_db(error):
+def close_db():
     """Close the database connection at the end of each request."""
     if hasattr(g, 'db'):
         g.db.close()
@@ -40,25 +43,25 @@ def check_username():
         return jsonify({"message": "username exists"}), 201
     return jsonify({"message": "username does not exist"}), 200
 
-@app.route('/register', methods=['POST'])
-def register():
+@app.route('/register_user', methods=['POST'])
+def register_user():
     data = request.json
     username = data.get('username')
     password = data.get('password')
-    user_aes = data.get('aes')
-    user_rsa = data.get('rsa')
+    encrypted_aes_key = data.get('encrypted_aes_key')
+    public_key = data.get('public_key')
     db = get_db()
     cursor = db.cursor()
-    hashed_password = hash_password(password)
+    hashed_password = Utils.hash_password(password)
     cursor.execute(
-        "INSERT INTO users (username, password, key, pk) VALUES (?, ?, ?, ?)",
-        (username, hashed_password, user_aes, user_rsa)
+        "INSERT INTO users (username, password, encrypted_aes_key, public_key) VALUES (?, ?, ?, ?)",
+        (username, hashed_password, encrypted_aes_key, public_key)
     )
     db.commit()
     return jsonify({"message": "Registered Successfully"}), 200
 
-@app.route('/login', methods=['POST'])
-def login():
+@app.route('/login_user', methods=['POST'])
+def login_user():
     data = request.json
     username = data.get('username')
     password = data.get('password')
@@ -67,7 +70,7 @@ def login():
     cursor.execute("SELECT password FROM users WHERE username = ?", (username,))
     result = cursor.fetchone()
     stored_hash = result[0]
-    if check_password(password, stored_hash):
+    if Utils.check_password(password, stored_hash):
         return jsonify({"message": "password matches"}), 200
     return jsonify({"message": "password does not match"}), 201
 
@@ -79,7 +82,7 @@ def reset_password():
     new_aes = data.get('new_aes')
     db = get_db()
     cursor = db.cursor()
-    new_hashed_password = hash_password(new_password)
+    new_hashed_password = Utils.hash_password(new_password)
     cursor.execute(
         "UPDATE users SET password = ?, key = ? WHERE username = ?",
         (new_hashed_password, new_aes, username)
@@ -87,43 +90,42 @@ def reset_password():
     db.commit()
     return jsonify({"message": "password reset"}), 200
 
-# Endpoint: Upload a file (owned)
-@app.route('/upload', methods=['POST'])
-def upload():
+# Endpoint: Upload a file
+@app.route('/upload_file', methods=['POST'])
+def upload_file():
     username = request.form.get('username')
     file = request.files.get('file')
     if not username or not file:
         return jsonify({"error": "Missing username or file"}), 400
-
     file_id = file_manager.add_file(username, file.filename, file.read())
-    return jsonify({"file_id": file_id})
+    return jsonify({"file_id": file_id}), 200
 
 # Endpoint: Edit a file (only if owned by the requester)
-@app.route('/edit', methods=['POST'])
-def edit():
+@app.route('/edit_file', methods=['POST'])
+def edit_file():
     username = request.json.get('username')
     file_id = request.json.get('file_id')
     new_content = request.json.get('content')
     try:
         file_manager.edit_file(username, file_id, new_content.encode())
-        return jsonify({"success": True})
+        return jsonify({"success": True}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 403
 
 # Endpoint: Delete a file (only if owned by the requester)
-@app.route('/delete', methods=['POST'])
+@app.route('/delete_file', methods=['POST'])
 def delete():
     username = request.json.get('username')
     file_id = request.json.get('file_id')
     try:
         file_manager.delete_file(username, file_id)
-        return jsonify({"success": True})
+        return jsonify({"success": True}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 403
 
 # Endpoint: Share a file
-@app.route('/share', methods=['POST'])
-def share():
+@app.route('/share_file', methods=['POST'])
+def share_file():
     """
     Expected JSON payload:
     {
@@ -146,54 +148,55 @@ def share():
     except Exception as e:
         return jsonify({"error": str(e)}), 403
 
-# Endpoint: View all files for a user
-@app.route('/view_files', methods=['POST'])
-def view_files():
+# Endpoint: Get all files for a user
+@app.route('/get_files', methods=['POST'])
+def get_files():
     username = request.json.get('username')
     if not username:
         return jsonify({"error": "Missing username"}), 400
     try:
-        files = file_manager.view_files(username)
+        files = file_manager.get_files(username)
         return jsonify({"files": files}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 403
 
-# Updated Endpoint: Get a file's content and access attribute
-@app.route('/get', methods=['POST'])
-def get_file():
+# Endpoint: View a file's content
+@app.route('/view_file', methods=['POST'])
+def view_file():
     username = request.json.get('username')
     file_id = request.json.get('file_id')
     if not username or not file_id:
         return jsonify({"error": "Missing username or file_id"}), 400
     try:
-        content, access = file_manager.get_file(username, file_id)
+        content, access = file_manager.view_file(username, file_id)
         # Assuming text content; adjust if binary data (e.g., use base64 encoding)
         return jsonify({"content": content.decode(), "access": access})
     except Exception as e:
         return jsonify({"error": str(e)}), 403
     
-# Endpoint: View all files of a user
+# Endpoint: Get users
 @app.route('/get_users', methods=['POST'])
 def get_users():
+    usernames = None
     try:
-        users_names = ','.join(file_manager.get_user())
-        return jsonify({"message": users_names})
+        usernames = ','.join(file_manager.get_users())
     except Exception as e:
         return jsonify({"error": str(e)}), 403
+    return jsonify({"message": usernames}), 200
 
 
-# Endpoint: Require AES key
-@app.route('/require_aes', methods=['POST'])
-def require_aes():
+# Endpoint: Get AES key
+@app.route('/get_aes', methods=['POST'])
+def get_aes():
     username = request.json.get('username')
     user_aes = file_manager.get_user_aes(username)
     if not user_aes:
         return jsonify({"error": f"AES key for {username} not found"}), 400
-    return jsonify({"aes": user_aes})
+    return jsonify({"aes": user_aes}), 200
 
-# Endpoint: Require RSA key
-@app.route('/require_rsa', methods=['POST'])
-def require_rsa():
+# Endpoint: Get RSA key
+@app.route('/get_rsa', methods=['POST'])
+def get_rsa():
     username = request.json.get('username')
     user_rsa = file_manager.get_user_aes(username)
     if not user_rsa:
@@ -201,4 +204,4 @@ def require_rsa():
     return jsonify({"rsa": user_rsa})
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5080, debug=True)
+    app.run(host="0.0.0.0", port=5100, debug=True)

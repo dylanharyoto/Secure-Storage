@@ -1,7 +1,7 @@
 import requests
 import os
 from SourceCode.shared.utils import check_username_regex, check_password_regex
-from encryption import AES_encrypt, generate_rsa_keys, encrypt_file, decrypt_file, encrypt_file_for_sharing, decrypt_shared_file, recover_key_check, password_hashA
+from SourceCode.client.CryptoManager import AES_encrypt, generate_rsa_keys, encrypt_file, decrypt_file, encrypt_file_for_sharing, decrypt_shared_file, recover_key_check, password_hashA
 
 class User_Iuput_Output:
     def __init__(self):
@@ -9,12 +9,12 @@ class User_Iuput_Output:
 
     def register_user_IO(self):
         flag_username, flag_password1, flag_password2 = False, False, False
-        username, password1, password2 = None, None, None
+        username, password1, password2, encrypted_aes_key, recovery_key, secret_key, public_key = None, None, None, None, None, None, None
         while not (flag_username and flag_password1 and flag_password2):
             if not flag_username:
                 username = input('Enter your email address (or type "q" to EXIT):\n> ').strip()
                 if username == "q":
-                    return None
+                    return False, None, None
                 if not check_username_regex(username):
                     print('[ERROR] Invalid email format.')
                     continue
@@ -32,7 +32,7 @@ class User_Iuput_Output:
             elif not flag_password1:
                 password1 = input('Enter a password with at least 8 characters (or type "q" to EXIT, "b" to BACK):\n> ').strip()
                 if password1 == "q":
-                    return None
+                    return False, None, None
                 if password1 == "b":
                     flag_username = False
                     continue
@@ -43,7 +43,7 @@ class User_Iuput_Output:
             elif not flag_password2:
                 password2 = input('Confirm your password (or type "q" to EXIT, "b" to BACK):\n> ').strip()
                 if password2 == "q":
-                    return None
+                    return False, None, None
                 if password2 == "b":
                     flag_password1 = False
                     continue
@@ -51,26 +51,24 @@ class User_Iuput_Output:
                     print("[ERROR] Passwords do not match.")
                     continue
                 try:
-                    encrypted_combined_key, recover_key = AES_encrypt(password1)
-                    sk, pk = generate_rsa_keys()
+                    encrypted_aes_key, recovery_key = AES_encrypt(password1)
+                    secret_key, public_key = generate_rsa_keys()
                     password_hash = password_hashA(password1)
-                    response = requests.post(f"{self.server_url}/register", json={"username": username, "password": password_hash, 
-                                                                                  "aes": encrypted_combined_key, "rsa": pk})
+                    response = requests.post(f"{self.server_url}/register_user", json={"username": username, "password": password_hash, "encrypted_aes_key": encrypted_aes_key, "public_key": public_key})
                     if response.status_code == 200:
                         flag_password2 = True
                         print(f"[STATUS] Email '{username}' registered successfully.")
-                        return recover_key, sk
+                        flag_password2 = True
                     else:
                         print("[ERROR] Server error.")
-                        return False
+                        return False, None, None
                 except requests.exceptions.RequestException as e:
                     print(f"[ERROR] Network error: {e}.")
-                    return False
-        return True
-
+                    return False, None, None
+        return True, recovery_key, secret_key
     def login_user_IO(self):
         flag_username, flag_password = False, False
-        username = None
+        username, password = None, None
         while not (flag_username and flag_password):
             if not flag_username:
                 username = input('Enter your email address (or type "q" to EXIT):\n> ').strip()
@@ -103,7 +101,7 @@ class User_Iuput_Output:
                     continue
                 try:
                     password_hash = password_hashA(password)
-                    response = requests.post(f"{self.server_url}/login", json={"username": username, "password": password_hash})
+                    response = requests.post(f"{self.server_url}/login_user", json={"username": username, "password": password_hash})
                     if response.status_code == 200:
                         flag_password = True
                     elif response.status_code == 201:
@@ -115,7 +113,6 @@ class User_Iuput_Output:
                     print(f"[ERROR] Network error: {e}.")
                     return False, None, None
         return True, username, password
-
     def reset_password_IO(self):
         flag_username, flag_recover_key, flag_new_password1, flag_new_password2 = False, False, False, False
         username, recover_key, new_password1, new_password2 = None, None, None, None
@@ -149,7 +146,7 @@ class User_Iuput_Output:
                     flag_username = False
                     continue
                 try:
-                    response = requests.post(f"{self.server_url}/require_aes", json={"username": username})
+                    response = requests.post(f"{self.server_url}/get_aes", json={"username": username})
                     if response.status_code == 200:
                         user_aes = response.json()['aes']
                         key_check = recover_key_check(recover_key, user_aes)
@@ -205,12 +202,8 @@ class User_Iuput_Output:
                 except requests.exceptions.RequestException as e:
                     print(f"[ERROR] Network error: {e}.")
                     return False
-
-        return True
-    
-    
-    
-    def upload_file(self, username, password):
+        return True  
+    def upload_file_IO(self, username, password):
         """
         Encrypt and upload a file to the server
         """
@@ -224,7 +217,7 @@ class User_Iuput_Output:
             encry_file_path = os.path.join("temp", file_name)
             # Get user's encrypted aes key from server
             try:
-                response = requests.post(f"{self.server_url}/require_aes", json={"username": username})
+                response = requests.post(f"{self.server_url}/get_aes", json={"username": username})
             except requests.exceptions.RequestException as e:
                 print(f"[ERROR] Network error: {e}.")
                 return None
@@ -234,7 +227,7 @@ class User_Iuput_Output:
 
             files = {'file': file}
             try:
-                response = requests.post(f"{self.server_url}/upload", files=files, data={'username': username})
+                response = requests.post(f"{self.server_url}/upload_file", files=files, data={'username': username})
                 if response.status_code == 400:
                     error = response.json()["error"]
                     print(f"[ERROR] {error}")
@@ -246,14 +239,12 @@ class User_Iuput_Output:
                 print(f"[ERROR] Network error: {e}.")
                 return None
         print("[ERROR] Invalid file path or file does not exist.")
-
-    def edit_file(self, username, password):
+    def edit_file_IO(self, username, password):
         """
         Update the target file by sending new content to server
         """
         # file flag tests if user has already input a target file, and path flag tests if user finish process
-        path_flag = False
-        file_flag = False
+        path_flag, file_flag = False, False
         file_id = 0
         while not path_flag:
             try:
@@ -281,7 +272,7 @@ class User_Iuput_Output:
                     encry_file_path = os.path.join("temp", file_name)
                     # Get user's encrypted aes key from server
                     try:
-                        response = requests.post(f"{self.server_url}/require_aes", json={'username': username})
+                        response = requests.post(f"{self.server_url}/get_aes", json={'username': username})
                         if response.status_code == 400:
                             error = response.json()["error"]
                             print(f"[ERROR] {error}")
@@ -295,7 +286,7 @@ class User_Iuput_Output:
 
                     # Request for the file content from server
                     data = {'username': username, 'file_id': file_id, 'content': new_content}
-                    response = requests.post(f"{self.server_url}/edit", json=data)
+                    response = requests.post(f"{self.server_url}/edit_file", json=data)
                     if response.status_code == 403:
                         error = response.json()["error"]
                         print(f"[ERROR] {error}")
@@ -310,19 +301,18 @@ class User_Iuput_Output:
             except requests.exceptions.RequestException as e:
                 print(f"[ERROR] Network error: {e}.")
                 return None
-
-    def delete_file(self, username):
+    def delete_file_IO(self, username):
         """
         Delete the target file from server storage
         """
         try:
             # Query user for the file id of file to be deleted
-            choice = input("Please input the file ID for the file to be edited (or type \"q\" to EXIT):\n> ")
+            choice = input("Please input the file ID for the file to be deleted (or type \"q\" to EXIT):\n> ")
             if choice == 'q':
                 return None
             file_id = int(choice)
             data = {'username': username, 'file_id': file_id}
-            response = requests.post(f"{self.server_url}/delete", json=data)
+            response = requests.post(f"{self.server_url}/delete_file", json=data)
 
             if response.status_code == 403:
                 error = response.json()["error"]
@@ -336,15 +326,13 @@ class User_Iuput_Output:
         except requests.exceptions.RequestException as e:
             print(f"[ERROR] Network error: {e}.")
             return None
-    
-    def share_users(self, username):
+    def share_file_IO(self, username):
         """
         Fetch all users available and allow current user to choose those to share with
         Then send information to server
         """
         # file flag tests if user has already input a target file, and user flag tests if user finish process
-        user_flag = False
-        file_flag = False
+        user_flag, file_flag = False, False
         file_id = 0
         user_names = []
 
@@ -406,7 +394,7 @@ class User_Iuput_Output:
                                 }
                             }
 
-                    response = requests.post(f"{self.server_url}/get", json={'username': username, 'file_id': file_id})
+                    response = requests.post(f"{self.server_url}/share_file", json={'username': username, 'file_id': file_id})
                     response_data = response.json()
                     if response.status_code > 399:
                         error = response_data["error"]
@@ -439,7 +427,7 @@ class User_Iuput_Output:
                 print("[ERROR] Please input a valid user index")
                 continue
 
-    def download_file(self, username, password):
+    def download_file_IO(self, username, password):
         """
         Download an existing file from the server to a specific directory.
         """
@@ -467,7 +455,7 @@ class User_Iuput_Output:
 
                 # Request for the file content from server
                 data = {'username': username, 'file_id': file_id}
-                response = requests.post(f"{self.server_url}/get", json=data)
+                response = requests.post(f"{self.server_url}/get_file", json=data)
                 if response.status_code == 403:
                         error = response.json()["error"]
                         print(f"[ERROR] {error}")
@@ -496,13 +484,12 @@ class User_Iuput_Output:
             except requests.exceptions.RequestException as e:
                 print(f"[ERROR] Network error: {e}.")
                 return None
-        
-    def user_read_storage(self, username):
+    def view_file_IO(self, username):
         """
         Fetch all file names in the storages that this client can read.
         """
         try:
-            response = requests.post(f"{self.server_url}/view_files", json={"username": username})
+            response = requests.post(f"{self.server_url}/view_file", json={"username": username})
 
             #Print out existing files with id
             if response.status_code == 200:
