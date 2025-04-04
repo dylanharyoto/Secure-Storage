@@ -12,23 +12,23 @@ def run():
         print("4. Exit")
         choice = input("Enter your choice:\n> ").strip()
         if choice == "1":
-            status, recover_key, secret_key = user_management.register_user_IO()
-            if status:
+            status, recovery_key, secret_key = UserManagement.register_user_IO()
+            if status and recovery_key and secret_key:
                 print(f"[INFO] Registration sucessful.")
         elif choice == "2":
-            status, username, password = user_management.login_user_IO()
-            if status:
+            status, username, password = UserManagement.login_user_IO()
+            if status and username and password:
                 print("[INFO] Login successful.")
                 session(username, password)
         elif choice == "3":
-            status = user_management.reset_password_IO()
+            status, recovery_key = UserManagement.reset_password_IO()
             if status:
                 print("[INFO] Password reset successful.")
         elif choice == "4":
             print("Exiting User Management...")
             break
         else:
-            print("Invalid choice. Please try again.")
+            print("[ERROR] Invalid choice. Please try again.")
 
 def session(username, password):
     while True:
@@ -42,17 +42,17 @@ def session(username, password):
         print("7. Log Out")
         choice = input("Enter your choice:\n> ").strip()
         if choice == "1":
-            user_management.view_file_IO(username)
+            UserManagement.view_file_IO(username)
         elif choice == "2":
-            user_management.upload_file_IO(username, password)
+            UserManagement.upload_file_IO(username, password)
         elif choice == "3":
-            user_management.download_file_IO(username, password)
+            UserManagement.download_file_IO(username, password)
         elif choice == "4":
-            user_management.edit_file_IO(username, password)
+            UserManagement.edit_file_IO(username, password)
         elif choice == "5":
-            user_management.delete_file_IO(username)
+            UserManagement.delete_file_IO(username)
         elif choice == "6":
-            user_management.share_file_IO(username)
+            UserManagement.share_file_IO(username)
         elif choice == "7":
             print("User Logging Out...")
             break
@@ -61,5 +61,4 @@ def session(username, password):
     
 
 if __name__ == "__main__":
-    user_management = UserManagement()
     run()

@@ -28,16 +28,15 @@ class UserManagement:
                     continue
                 try:
                     response = requests.post(f"{SERVER_URL}/check_username", json={"username": username})
-                    if response.status_code == 200:
-                        flag_username = True # next step
-                    elif response.status_code == 201:
+                    if response.status_code == 201:
                         print('[ERROR] Email already exists.')
-                    else:
+                    elif response.status_code == None:
                         print("[ERROR] Server error.")
                 except requests.exceptions.RequestException as error:
                     print(f"[ERROR] Network error: {error}.")
                     continue
-            elif not flag_password1:
+                flag_username = True
+            if not flag_password1:
                 password1 = input('Enter a password with at least 8 characters (or type "q" to EXIT, "b" to BACK):\n> ').strip()
                 if password1 == "q":
                     return False, None, None
@@ -48,7 +47,7 @@ class UserManagement:
                     print("[ERROR] Password must be at least 8 characters long.")
                     continue
                 flag_password1 = True
-            elif not flag_password2:
+            if not flag_password2:
                 password2 = input('Confirm your password (or type "q" to EXIT, "b" to BACK):\n> ').strip()
                 if password2 == "q":
                     return False, None, None
@@ -58,21 +57,20 @@ class UserManagement:
                 if password2 != password1:
                     print("[ERROR] Passwords do not match.")
                     continue
-                try:
-                    encrypted_aes_key, recovery_key = CryptoManager.encrypt_with_aes(password1)
-                    secret_key, public_key = CryptoManager.generate_rsa_key_pair()
-                    hashed_password = CryptoManager.hash_password(password1)
-                    response = requests.post(f"{SERVER_URL}/register_user", json={"username": username, "password": hashed_password, "encrypted_aes_key": encrypted_aes_key, "public_key": public_key})
-                    if response.status_code == 200:
-                        flag_password2 = True
-                        print(f"[STATUS] Email '{username}' registered successfully.")
-                        flag_password2 = True
-                    else:
-                        print("[ERROR] Server error.")
-                        return False, None, None
-                except requests.exceptions.RequestException as error:
-                    print(f"[ERROR] Network error: {error}.")
-                    return False, None, None
+                flag_password2 = True
+        try:
+            encrypted_aes_key, recovery_key = CryptoManager.encrypt_with_aes(password1)
+            secret_key, public_key = CryptoManager.generate_rsa_key_pair()
+            hashed_password = CryptoManager.hash_password(password1)
+            response = requests.post(f"{SERVER_URL}/register_user", json={"username": username, "password": hashed_password, "encrypted_aes_key": encrypted_aes_key, "public_key": public_key})
+            if response.status_code == 200:
+                print(f"[STATUS] Email '{username}' registered successfully.")
+            elif response.status_code == None:
+                print("[ERROR] Server error.")
+                return False, None, None
+        except requests.exceptions.RequestException as error:
+            print(f"[ERROR] Network error: {error}.")
+            return False, None, None
         return True, recovery_key, secret_key
     @staticmethod
     def login_user_IO():
@@ -92,15 +90,14 @@ class UserManagement:
                     response = requests.post(f"{SERVER_URL}/check_username", json={"username": username})
                     if response.status_code == 200:
                         print("[ERROR] Email not found.")
-                    elif response.status_code == 201:
-                        flag_username = True
-                    else:
+                    elif response.status_code == None:
                         print("[ERROR] Server error.")
                         return False, None, None
                 except requests.exceptions.RequestException as error:
                     print(f"[ERROR] Network error: {error}.")
                     return False, None, None
-            elif not flag_password:
+                flag_username = True
+            if not flag_password:
                 password = input('Enter your password (or type "q" to EXIT, "b" to BACK):\n> ').strip()
                 if password == "q":
                     return False, None, None
@@ -110,19 +107,18 @@ class UserManagement:
                 if not Utils.check_password_regex(password):
                     print("[ERROR] Password must be at least 8 characters long!")
                     continue
-                try:
-                    hashed_password = CryptoManager.hash_password(password)
-                    response = requests.post(f"{SERVER_URL}/login_user", json={"username": username, "password": hashed_password})
-                    if response.status_code == 200:
-                        flag_password = True
-                    elif response.status_code == 201:
-                        print("[ERROR] Incorrect password.")
-                    else:
-                        print("[ERROR] Server error.")
-                        return False, None, None
-                except requests.exceptions.RequestException as error:
-                    print(f"[ERROR] Network error: {error}.")
-                    return False, None, None
+                flag_password = True
+        try:
+            hashed_password = CryptoManager.hash_password(password)
+            response = requests.post(f"{SERVER_URL}/login_user", json={"username": username, "password": hashed_password})
+            if response.status_code == 201:
+                print("[ERROR] Incorrect password.")
+            elif response.status_code == None:
+                print("[ERROR] Server error.")
+                return False, None, None
+        except requests.exceptions.RequestException as error:
+            print(f"[ERROR] Network error: {error}.")
+            return False, None, None
         return True, username, password
     @staticmethod
     def reset_password_IO():
@@ -147,14 +143,13 @@ class UserManagement:
                     if response.status_code == 200:
                         print("[ERROR] Email not found.")
                         continue
-                    elif response.status_code == 201:
-                        flag_username = True
-                    else:
+                    elif response.status_code == None:
                         print("[ERROR] Server error")
                         return False, None
                 except requests.exceptions.RequestException as error:
                     print(f"[ERROR] Network error: {error}")
                     return False, None
+                flag_username = True
             if not flag_recovery_key:
                 recovery_key = input('Enter your recovery key (or type "q" to EXIT, "b" to BACK):\n> ').strip()
                 if recovery_key == "q":
@@ -168,7 +163,6 @@ class UserManagement:
                         user_aes_key = response.json()['aes']
                         key_verification_result = CryptoManager.verify_recovery_key(recovery_key, user_aes_key)
                         if key_verification_result[0]:
-                            flag_recovery_key = True
                             verified_recovery_key = key_verification_result[1]
                         else:
                             print("[ERROR] Validation failed. Recovery key is incorrect.")
@@ -177,13 +171,13 @@ class UserManagement:
                         error = response.json()["error"]
                         print(f"[ERROR] {error}")
                         continue
-                    else:
+                    elif response.status_code == None:
                         print("[ERROR] Server error")
                         return False, None
                 except requests.exceptions.RequestException as error:
                     print(f"[ERROR] Network error: {error}")     
                     return False, None
-            # User passed the authentication test, now is able to reset the password
+                flag_recovery_key = True
             if not flag_new_password1:
                 new_password1 = input('Enter a new password with at least 8 characters (or type "q" to EXIT):\n> ').strip()
                 if new_password1 == "q":
@@ -202,124 +196,127 @@ class UserManagement:
                 if new_password2 != new_password1:
                     print("[ERROR] Passwords do not match.")
                     continue
-                # Send new password hash and encrypted key to server
-                try:
-                    encrypted_aes_key, recovery_key = CryptoManager.encrypt_with_aes(new_password1)
-                    hashed_new_password = CryptoManager.hash_password(new_password1)
-                    response = requests.post(f"{SERVER_URL}/reset_password", json={
-                        "username": username, 
-                        "new_password": hashed_new_password,
-                        "new_aes": encrypted_aes_key
-                    })
-                    if response.status_code == 200:
-                        print(f"[STATUS] Email '{username}' registered successfully.")
-                        flag_new_password2 = True
-                    else:
-                        print("[ERROR] Server error.")
-                        return False, None
-                except requests.exceptions.RequestException as e:
-                    print(f"[ERROR] Network error: {e}.")
-                    return False, None
+                flag_new_password2 = True
+        try:
+            encrypted_aes_key, recovery_key = CryptoManager.encrypt_with_aes(new_password1)
+            hashed_new_password = CryptoManager.hash_password(new_password1)
+            response = requests.post(f"{SERVER_URL}/reset_password", json={
+                "username": username, 
+                "new_password": hashed_new_password,
+                "new_aes": encrypted_aes_key
+            })
+            if response.status_code == 200:
+                print(f"[STATUS] Email '{username}' registered successfully.")
+            elif response.status_code == None:
+                print("[ERROR] Server error.")
+                return False, None
+        except requests.exceptions.RequestException as error:
+            print(f"[ERROR] Network error: {error}.")
+            return False, None
         return True, recovery_key
     @staticmethod
     def upload_file_IO(username, password):
-        """
-        Encrypt and upload a file to the server
-        """
-        file_path = input("Please input the path of the file to be uploaded (or type \"q\" to EXIT):\n> ")
-        if file_path == 'q':
-            return None
-        
-        if os.path.isfile(file_path):
-            file_name = os.path.basename(file_path)
-            # Encrypt the target file and store cipher text into temp file
-            encry_file_path = os.path.join("temp", file_name)
-            # Get user's encrypted aes key from server
-            try:
-                response = requests.post(f"{SERVER_URL}/get_aes", json={"username": username})
-            except requests.exceptions.RequestException as e:
-                print(f"[ERROR] Network error: {e}.")
-                return None
-            user_aes_key = response.json()['aes']
-            # Process original file and make a temp new file, store the path of new into encry_file_path
-            file = CryptoManager.encrypt_file_with_aes(password, user_aes_key, file_path)
-
-            files = {'file': file}
-            try:
-                response = requests.post(f"{SERVER_URL}/upload_file", files=files, data={'username': username})
-                if response.status_code == 400:
-                    error = response.json()["error"]
-                    print(f"[ERROR] {error}")
-                    return None
-                # Remove the temp file
-                os.remove(encry_file_path)
-                return response.json()
-            except requests.exceptions.RequestException as e:
-                print(f"[ERROR] Network error: {e}.")
-                return None
-        print("[ERROR] Invalid file path or file does not exist.")
-    def edit_file_IO(self, username, password):
+        file_path_flag = False
+        file_path = None
+        file_id = None
+        while not file_path_flag:
+            file_path = input("Please input the path of the file to be uploaded (or type \"q\" to EXIT):\n> ")
+            if file_path == 'q':
+                return False
+            if not os.path.isfile(file_path):
+                print("[ERROR] Invalid file path or file does not exist.")
+                continue
+            file_path_flag = True
+        file_name = os.path.basename(file_path)
+        # Encrypt the target file and store cipher text into temp file
+        encrypted_file_path = os.path.join("temp", file_name)
+        # Get user's encrypted aes key from server
+        try:
+            response = requests.post(f"{SERVER_URL}/get_aes", json={"username": username})
+        except requests.exceptions.RequestException as error:
+            print(f"[ERROR] Network error: {error}.")
+            return False
+        user_aes_key = response.json()['aes']
+        # Process original file and make a temp new file, store the path of new into encrypted_file_path
+        encrypted_file_data = CryptoManager.encrypt_file_with_aes(password, user_aes_key, file_path)
+        files = {'file': encrypted_file_data}
+        try:
+            response = requests.post(f"{SERVER_URL}/upload_file", files=files, data={'username': username})
+            if response.status_code == 200:
+                print(f"[STATUS] File '{username}' uploaded successfully.")
+            elif response.status_code == 400:
+                error = response.json()["error"]
+                print(f"[ERROR] {error}")
+                return False
+            # Remove the temp file
+            os.remove(encrypted_file_path)
+            file_id = response.json()
+        except requests.exceptions.RequestException as error:
+            print(f"[ERROR] Network error: {error}.")
+            return False
+        return True, file_id
+    @staticmethod
+    def edit_file_IO(username, password):
         """
         Update the target file by sending new content to server
         """
         # file flag tests if user has already input a target file, and path flag tests if user finish process
-        path_flag, file_flag = False, False
-        file_id = 0
-        while not path_flag:
-            try:
-                # Query user for the file id of file to be edited
-                if not file_flag:
-                    choice = input("Please input the file ID for the file to be edited (or type \"q\" to EXIT):\n> ")
-                    if choice == 'q':
-                        return None
-                    file_id = int(choice)
-                file_flag = True
-
+        file_id_flag = False
+        path_flag = False
+        file_id = None
+        file_path = None
+        while not (path_flag and file_id_flag):
+            # Query user for the file id of file to be edited
+            if not file_id_flag:
+                file_id = input("Please input the file ID for the file to be edited (or type \"q\" to EXIT):\n> ")
+                if file_id == "q":
+                    return False
+                file_id = int(file_id)
+                file_id_flag = True
+            if not path_flag:
                 # Query user for local file to replace
-                choice = input("Please input the path of the file to be edited  (or type \"q\" to EXIT, \"b\" to BACK):\n> ")
-                if choice == "q":
-                    return None
-                # Re-enter target file
-                if choice == "b":
-                    file_flag = False
+                file_path = input("Please input the path of the file to be edited (or type \"q\" to EXIT, \"b\" to BACK):\n> ")
+                if file_path == "q":
+                    return False
+                if file_path == "b":
+                    file_id_flag = False
                     continue
-                file_path = choice
-                if os.path.isfile(file_path):
-                    
-                    file_name = os.path.basename(file_path)
-                    # Encrypt the target file and store cipher text into temp file
-                    encry_file_path = os.path.join("temp", file_name)
-                    # Get user's encrypted aes key from server
-                    try:
-                        response = requests.post(f"{SERVER_URL}/get_aes", json={'username': username})
-                        if response.status_code == 400:
-                            error = response.json()["error"]
-                            print(f"[ERROR] {error}")
-                            return None
-                    except requests.exceptions.RequestException as e:
-                        print(f"[ERROR] Network error: {e}.")
-                        return None
-                    user_aes_key = response.json()['aes']
-                    # Process original file and make a temp new file, store the path of new into encry_file_path
-                    new_content = CryptoManager.encrypt_file_with_aes(password, user_aes_key, file_path)
-
-                    # Request for the file content from server
-                    data = {'username': username, 'file_id': file_id, 'content': new_content}
-                    response = requests.post(f"{SERVER_URL}/edit_file", json=data)
-                    if response.status_code == 403:
+                path_flag = True
+        try:
+            if os.path.isfile(file_path):
+                file_name = os.path.basename(file_path)
+                # Encrypt the target file and store cipher text into temp file
+                encrypted_file_path = os.path.join("temp", file_name)
+                # Get user's encrypted aes key from server
+                try:
+                    response = requests.post(f"{SERVER_URL}/get_aes", json={'username': username})
+                    if response.status_code == 400:
                         error = response.json()["error"]
                         print(f"[ERROR] {error}")
                         return None
-                    # Remove the temp file
-                    os.remove(encry_file_path)
-                    return response.json()
-                print("[ERROR] Invalid file path or file does not exist.")
-            
-            except ValueError:
-                print("[ERROR] Please input a valid integer")
-            except requests.exceptions.RequestException as e:
-                print(f"[ERROR] Network error: {e}.")
-                return None
+                except requests.exceptions.RequestException as e:
+                    print(f"[ERROR] Network error: {e}.")
+                    return None
+                user_aes_key = response.json()['aes']
+                # Process original file and make a temp new file, store the path of new into encrypted_file_path
+                new_content = CryptoManager.encrypt_file_with_aes(password, user_aes_key, file_path)
+
+                # Request for the file content from server
+                data = {'username': username, 'file_id': file_id, 'content': new_content}
+                response = requests.post(f"{SERVER_URL}/edit_file", json=data)
+                if response.status_code == 403:
+                    error = response.json()["error"]
+                    print(f"[ERROR] {error}")
+                    return None
+                # Remove the temp file
+                os.remove(encrypted_file_path)
+                return response.json()
+            print("[ERROR] Invalid file path or file does not exist.")
+        except ValueError:
+            print("[ERROR] Please input a valid integer")
+        except requests.exceptions.RequestException as e:
+            print(f"[ERROR] Network error: {e}.")
+            return None
     def delete_file_IO(self, username):
         """
         Delete the target file from server storage

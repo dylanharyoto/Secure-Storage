@@ -9,6 +9,7 @@ from Crypto.Cipher import PKCS1_OAEP
 import bcrypt
 import base64
 
+
 #.encode('utf-8')
 
 class CryptoManager:
