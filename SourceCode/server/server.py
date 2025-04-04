@@ -94,9 +94,8 @@ def upload_file():
     file = request.files.get('file')
     if not username or not file:
         return jsonify({"error": "Missing username or file"}), 400
-
     file_id = file_manager.add_file(username, file.filename, file.read())
-    return jsonify({"file_id": file_id})
+    return jsonify({"file_id": file_id}), 200
 
 # Endpoint: Edit a file (only if owned by the requester)
 @app.route('/edit_file', methods=['POST'])
@@ -106,7 +105,7 @@ def edit_file():
     new_content = request.json.get('content')
     try:
         file_manager.edit_file(username, file_id, new_content.encode())
-        return jsonify({"success": True})
+        return jsonify({"success": True}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 403
 
@@ -117,7 +116,7 @@ def delete():
     file_id = request.json.get('file_id')
     try:
         file_manager.delete_file(username, file_id)
-        return jsonify({"success": True})
+        return jsonify({"success": True}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 403
 
@@ -190,7 +189,7 @@ def get_aes():
     user_aes = file_manager.get_user_aes(username)
     if not user_aes:
         return jsonify({"error": f"AES key for {username} not found"}), 400
-    return jsonify({"aes": user_aes})
+    return jsonify({"aes": user_aes}), 200
 
 # Endpoint: Require RSA key
 @app.route('/require_rsa', methods=['POST'])

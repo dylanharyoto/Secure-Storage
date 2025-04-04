@@ -34,3 +34,7 @@ def check_username_regex(username):
 
 def check_password_regex(password):
     return len(password) >= 8
+
+def check_file_id_regex(file_id):
+    pattern = r'^[0-9(a-f|A-F)]{8}-[0-9(a-f|A-F)]{4}-4[0-9(a-f|A-F)]{3}-[89ab][0-9(a-f|A-F)]{3}-[0-9(a-f|A-F)]{12}$'
+    return re.match(pattern, file_id)
