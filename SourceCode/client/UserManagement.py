@@ -1,7 +1,7 @@
 import requests
 import os
-from SourceCode.Shared import Utils
-from SourceCode.Client import CryptoManager
+from SourceCode.Shared.Utils import Utils
+from SourceCode.Client.CryptoManager import CryptoManager
 
 
 SERVER_URL = os.getenv("SERVER_URL", "http://localhost:5080")
@@ -538,8 +538,8 @@ class UserManagement:
                 secret_key_flag = True
         #return response.json()
         return True
-
-    def view_file_IO(self, username):
+    @staticmethod
+    def view_file_IO(username):
         """
         Fetch all file names in the storages that this client can read.
         """

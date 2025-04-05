@@ -5,19 +5,31 @@ import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 from SourceCode.Shared.Utils import Utils
 from SourceCode.Server.FileManager import FileManager
+from SourceCode.Server.UserManager import UserManager
+
 
 app = Flask(__name__)
-app.config['DATABASE'] = os.path.join(os.path.dirname(__file__), "data", "Users.db")
+app.config['USERS_DATABASE'] = os.path.join(os.path.dirname(__file__), "data", "Users.db")
+app.config['FILES_DATABASE'] = os.path.join(os.path.dirname(__file__), "data", "Files.db")
 file_manager = FileManager()
-db_file_name = app.config['DATABASE']
-os.makedirs(os.path.dirname(db_file_name), exist_ok=True)
-user_schema = {
+os.makedirs(os.path.dirname(app.config['USERS_DATABASE']), exist_ok=True)
+os.makedirs(os.path.dirname(app.config['FILES_DATABASE']), exist_ok=True)
+users_schema = {
     "username": "TEXT PRIMARY KEY",
     "password": "TEXT NOT NULL",
     "encrypted_aes_key": "TEXT NOT NULL",
     "public_key": "TEXT NOT NULL"
 }
-Utils.init_database(db_file_name, "Users", user_schema)
+files_schema = {
+    "file_id": "TEXT PRIMARY KEY",
+    "owner": "TEXT NOT NULL",
+    "filename": "TEXT NOT NULL",
+    "access": "TEXT NOT NULL",
+    "content": "BLOB NOT NULL"
+}
+Utils.init_database(app.config['USERS_DATABASE'], "Users", users_schema)
+Utils.init_database(app.config['FILES_DATABASE'], "Files", files_schema)
+
 
 def get_db():
     """Get a database connection for the current request."""

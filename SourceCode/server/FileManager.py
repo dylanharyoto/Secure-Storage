@@ -16,19 +16,6 @@ class FileManager:
         self.user_conn = sqlite3.connect(users_db, check_same_thread=False)
         self.user_cursor = self.user_conn.cursor()
 
-    def _create_files_tables(self):
-        """Creates the tables for file metadata and sharing."""
-        self.cursor.execute("""
-            CREATE TABLE IF NOT EXISTS files (
-                file_id TEXT PRIMARY KEY,
-                owner TEXT NOT NULL,
-                filename TEXT NOT NULL,
-                access TEXT NOT NULL,
-                content BLOB NOT NULL
-            )
-        """)
-        self.conn.commit()
-
     def add_file(self, username, filename, content):
         """
         Add a new file to the system.
