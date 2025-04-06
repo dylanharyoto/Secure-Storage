@@ -29,7 +29,7 @@ class FileManager:
         self.conn.commit()
         return file_id
     
-    def get_user_aes(self, username):
+    def get_aes_key(self, username):
         """Retrieve aes key for a given username"""
         self.cursor.execute('''SELECT key FROM users WHERE username = ?''', (username,))
         user_aes = self.cursor.fetchone()

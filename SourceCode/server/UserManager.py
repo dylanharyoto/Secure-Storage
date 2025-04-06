@@ -6,8 +6,8 @@ class UserManager:
         """Check if a username exists in the users table."""
         cursor = db_conn.cursor()
         cursor.execute("SELECT * FROM users WHERE username = ?", (username,))
-        exists = cursor.fetchone() is not None
-        return exists
+        result = cursor.fetchone() is not None
+        return result
 
     @staticmethod
     def register_user(db_conn, username, password, encrypted_aes_key, public_key):
@@ -19,7 +19,9 @@ class UserManager:
             (username, hashed_password, encrypted_aes_key, public_key)
         )
         db_conn.commit()
-        return True
+        cursor.execute("SELECT * FROM users WHERE username = ?", (username,))
+        result = cursor.fetchone() is not None
+        return result
     
     @staticmethod
     def login_user(db_conn, username, password):
@@ -27,19 +29,20 @@ class UserManager:
         cursor = db_conn.cursor()
         cursor.execute("SELECT password FROM users WHERE username = ?", (username,))
         result = cursor.fetchone()
-        if not result:
-            return False  # Username not found
         stored_hash = result[0]
-        return Utils.check_password(password, stored_hash)
+        result = Utils.check_password(password, stored_hash)
+        return result
     
     @staticmethod
     def reset_password(db_conn, username, new_password, new_aes):
         """Reset a user's password and AES key."""
         cursor = db_conn.cursor()
-        new_hashed_password = Utils.hash_password(new_password)
+        #new_hashed_password = Utils.hash_password(new_password)
         cursor.execute(
             "UPDATE users SET password = ?, encrypted_aes_key = ? WHERE username = ?",
-            (new_hashed_password, new_aes, username)
+            (new_password, new_aes, username)
         )
         db_conn.commit()
-        return True
+        cursor.execute("SELECT password FROM users WHERE username = ?", (username,))
+        result = cursor.fetchone() is not None
+        return result

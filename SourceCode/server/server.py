@@ -31,29 +31,28 @@ Utils.init_database(app.config['USERS_DATABASE'], "Users", users_schema)
 Utils.init_database(app.config['FILES_DATABASE'], "Files", files_schema)
 
 
-def get_db():
+def get_db(config_key):
     """Get a database connection for the current request."""
-    if 'db' not in g:
-        g.db = sqlite3.connect(app.config['DATABASE'])
-    return g.db
+    db_attr = f'db_{config_key.lower()}'
+    if db_attr not in g:
+        setattr(g, db_attr, sqlite3.connect(app.config[config_key]))
+    return getattr(g, db_attr)
 
 @app.teardown_appcontext
 def close_db():
     """Close the database connection at the end of each request."""
-    if hasattr(g, 'db'):
-        g.db.close()
+    for attr in list(g.__dict__.keys()):
+        if attr.startswith("db_"):
+            getattr(g, attr).close()
+            delattr(g, attr)
 
 @app.route('/check_username', methods=['POST'])
 def check_username():
     data = request.json
     username = data.get('username')
-    db = get_db()
-    cursor = db.cursor()
-    cursor.execute("SELECT * FROM users WHERE username = ?", (username,))
-    exists = cursor.fetchone() is not None
-    if exists:
-        return jsonify({"message": "username exists"}), 201
-    return jsonify({"message": "username does not exist"}), 200
+    if UserManager.check_username(get_db('USERS_DATABASE'), username):
+        return jsonify({"message": "[STATUS] Email exists."}), 200
+    return jsonify({"message": "[STATUS] Email does not exist yet."}), 201
 
 @app.route('/register_user', methods=['POST'])
 def register_user():
@@ -62,45 +61,30 @@ def register_user():
     password = data.get('password')
     encrypted_aes_key = data.get('encrypted_aes_key')
     public_key = data.get('public_key')
-    db = get_db()
-    cursor = db.cursor()
-    hashed_password = Utils.hash_password(password)
-    cursor.execute(
-        "INSERT INTO users (username, password, encrypted_aes_key, public_key) VALUES (?, ?, ?, ?)",
-        (username, hashed_password, encrypted_aes_key, public_key)
-    )
-    db.commit()
-    return jsonify({"message": "Registered Successfully"}), 200
+    if UserManager.register_user(get_db("USERS_DATABASE"), username, password, encrypted_aes_key, public_key):
+        return jsonify({"message": f"[STATUS] Email '{username}' registered successfully."}), 200
+    return jsonify({"message": f"[ERROR] Email '{username}' failed to be registered."}), 400
+    
 
 @app.route('/login_user', methods=['POST'])
 def login_user():
     data = request.json
     username = data.get('username')
     password = data.get('password')
-    db = get_db()
-    cursor = db.cursor()
-    cursor.execute("SELECT password FROM users WHERE username = ?", (username,))
-    result = cursor.fetchone()
-    stored_hash = result[0]
-    if Utils.check_password(password, stored_hash):
-        return jsonify({"message": "password matches"}), 200
-    return jsonify({"message": "password does not match"}), 201
+    if UserManager.login_user(get_db("USERS_DATABASE"), username, password):
+        return jsonify({"message": f"[STATUS] Email '{username}' logged in successfully."}), 200
+    return jsonify({"message": "[ERROR] Incorrect password."}), 201
 
 @app.route('/reset_password', methods=['POST'])
 def reset_password():
     data = request.json
     username = data.get('username')
     new_password = data.get('new_password')
-    new_aes = data.get('new_aes')
-    db = get_db()
-    cursor = db.cursor()
-    new_hashed_password = Utils.hash_password(new_password)
-    cursor.execute(
-        "UPDATE users SET password = ?, key = ? WHERE username = ?",
-        (new_hashed_password, new_aes, username)
-    )
-    db.commit()
-    return jsonify({"message": "password reset"}), 200
+    new_aes_key = data.get('new_aes_key')
+    #new_hashed_password = Utils.hash_password(new_password)
+    if UserManager.reset_password(get_db("USERS_DATABASE"), username, new_password, new_aes_key):
+        return jsonify({"message": f"[STATUS] Password for '{username}' reset successfully."}), 200
+    return jsonify({"message": f"[ERROR] Password for '{username}' failed to be reset."}), 400
 
 # Endpoint: Upload a file
 @app.route('/upload_file', methods=['POST'])
@@ -198,13 +182,13 @@ def get_users():
 
 
 # Endpoint: Get AES key
-@app.route('/get_aes', methods=['POST'])
-def get_aes():
+@app.route('/get_aes_key', methods=['POST'])
+def get_aes_key():
     username = request.json.get('username')
-    user_aes = file_manager.get_user_aes(username)
-    if not user_aes:
-        return jsonify({"error": f"AES key for {username} not found"}), 400
-    return jsonify({"aes": user_aes}), 200
+    aes_key = file_manager.get_aes_key(username) # to be changed when file_manager is static
+    if aes_key:
+        return jsonify({"message": f"[STATUS] AES key for {username} exists.", "aes_key": aes_key}), 200
+    return jsonify({"message": f"[ERROR] AES key for {username} is not found"}), 201
 
 # Endpoint: Get RSA key
 @app.route('/get_rsa', methods=['POST'])
