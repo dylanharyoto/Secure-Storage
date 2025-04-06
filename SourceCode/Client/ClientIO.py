@@ -134,13 +134,18 @@ class ClientIO:
                     continue
                 hashed_password = CryptoManager.hash_password(password)
                 try:
+                    # Here, the login_user API is just to retrieved the stored hashA in server users database
                     response = requests.post(f"{SERVER_URL}/login_user", json={
                         "username": username, 
                         "password": hashed_password
                         })
                     if response.status_code == 200:
                         response_data = response.json()
-                        print(response_data["message"])
+                        auth_result = CryptoManager.check_password(password, response_data["hashed_password"])
+                        if auth_result:
+                            print (f"[STATUS] Email '{username}' log in successfully.")
+                        else:
+                            print (f"[ERROR] Email '{username}' failed to log in. Please double check your password.")
                     elif response.status_code == 201:
                         response_data = response.json()
                         print(response_data["message"])
