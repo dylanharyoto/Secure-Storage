@@ -15,9 +15,9 @@ FILES_DB = "FILES_DB"
 # Table Schemas
 users_schema = {
     "username": "TEXT PRIMARY KEY",
-    "password": "TEXT NOT NULL",
-    "encrypted_aes_key": "TEXT NOT NULL",
-    "public_key": "TEXT NOT NULL"
+    "password": "BLOB NOT NULL",
+    "encrypted_aes_key": "BLOB NOT NULL",
+    "public_key": "BLOB NOT NULL"
 }
 files_schema = {
     "file_id": "TEXT PRIMARY KEY",
@@ -64,11 +64,11 @@ def check_username():
 
 @app.route('/register_user', methods=['POST'])
 def register_user():
-    data = request.json
-    username = data.get('username')
-    password = data.get('password')
-    encrypted_aes_key = data.get('encrypted_aes_key')
-    public_key = data.get('public_key')
+
+    username = request.form.get('username')
+    password = request.form.get('password')
+    public_key = request.form.get('public_key')
+    encrypted_aes_key = request.files.get('encrypted_aes_key').read()
     if UserManager.register_user(get_db(USERS_DB), username, password, encrypted_aes_key, public_key):
         return jsonify({"message": f"[STATUS] Email '{username}' registered successfully."}), 200
     return jsonify({"message": f"[ERROR] Email '{username}' failed to be registered."}), 400
