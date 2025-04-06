@@ -4,8 +4,8 @@ from SourceCode.Shared.Utils import Utils
 from SourceCode.Client.CryptoManager import CryptoManager
 
 
-SERVER_URL = os.getenv("SERVER_URL", "http://localhost:5080")
-class UserManagement:
+SERVER_URL = os.getenv("SERVER_URL", "http://localhost:5100")
+class ClientIO:
     @staticmethod
     def register_user_IO():
         flag_username = False

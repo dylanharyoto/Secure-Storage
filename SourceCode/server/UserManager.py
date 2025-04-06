@@ -5,7 +5,7 @@ class UserManager:
     def check_username(db_conn, username):
         """Check if a username exists in the users table."""
         cursor = db_conn.cursor()
-        cursor.execute("SELECT * FROM users WHERE username = ?", (username,))
+        cursor.execute("SELECT * FROM Users WHERE username = ?", (username,))
         result = cursor.fetchone() is not None
         return result
 

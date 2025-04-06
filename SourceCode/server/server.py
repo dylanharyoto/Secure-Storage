@@ -46,10 +46,10 @@ def get_db(config_key):
     return getattr(g, db_attr)
 
 @app.teardown_appcontext
-def close_db():
+def close_db(exception = None):
     """Close the database connection at the end of each request."""
     for attr in list(g.__dict__.keys()):
-        if attr.endswith("_db"):
+        if attr.startswith("db_") and attr.endswith("_db"):
             getattr(g, attr).close()
             delattr(g, attr)
 
@@ -57,6 +57,7 @@ def close_db():
 def check_username():
     data = request.json
     username = data.get('username')
+    print(username)
     if UserManager.check_username(get_db(USERS_DB), username):
         return jsonify({"message": "[STATUS] Email exists."}), 200
     return jsonify({"message": "[STATUS] Email does not exist yet."}), 201
