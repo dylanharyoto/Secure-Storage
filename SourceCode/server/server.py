@@ -23,7 +23,7 @@ users_schema = {
 files_schema = {
     "file_id": "TEXT PRIMARY KEY",
     "owner": "TEXT NOT NULL",
-    "filename": "TEXT NOT NULL",
+    "file_name": "TEXT NOT NULL",
     "access": "TEXT NOT NULL",
     "content": "BLOB NOT NULL"
 }
@@ -93,7 +93,7 @@ def upload_file():
     file = request.files.get('file')
     if not username or not file:
         return jsonify({"message": "[ERROR] Missing username or file."}), 400
-    file_id = file_manager.add_file(username, file.filename, file.read())
+    file_id = file_manager.add_file(username, file.file_name, file.read()) # change file.filename to file.file_name
     return jsonify({"message": f"[STATUS] File '{username}' uploaded successfully.", "file_id": file_id}), 200
 
 # Endpoint: Edit a file (only if owned by the requester)
@@ -103,10 +103,10 @@ def edit_file():
     file_id = request.json.get('file_id')
     new_content = request.json.get('content')
     try:
-        file_manager.edit_file(username, file_id, new_content.encode())
-        return jsonify({"success": True}), 200
-    except Exception as e:
-        return jsonify({"error": str(e)}), 403
+        file_manager.edit_file(username, file_id, new_content.encode()) # to be chnaged when file_manager is static
+    except Exception as error:
+        return jsonify({"message": str(error)}), 403
+    return jsonify({"message": "f[STATUS] File '{file_id}' uploaded successfully."}), 200
 
 # Endpoint: Delete a file (only if owned by the requester)
 @app.route('/delete_file', methods=['POST'])
@@ -149,12 +149,12 @@ def share_file():
 def get_files():
     username = request.json.get('username')
     if not username:
-        return jsonify({"error": "Missing username"}), 400
+        return jsonify({"message": "[ERROR] Missing username."}), 400
     try:
         files = file_manager.get_files(username)
-        return jsonify({"files": files}), 200
-    except Exception as e:
-        return jsonify({"error": str(e)}), 403
+    except Exception as error:
+        return jsonify({"message": str(error)}), 403
+    return jsonify({"message": f"[STATUS] Files for {username} fetched successfully.", "files": files}), 200
 
 # Endpoint: View a file's content
 @app.route('/view_file', methods=['POST'])
@@ -188,7 +188,7 @@ def get_aes_key():
     aes_key = file_manager.get_aes_key(username) # to be changed when file_manager is static
     if aes_key:
         return jsonify({"message": f"[STATUS] AES key for {username} exists.", "aes_key": aes_key}), 200
-    return jsonify({"message": f"[ERROR] AES key for {username} is not found."}), 201
+    return jsonify({"message": f"[ERROR] AES key for {username} is not found."}), 400
 
 # Endpoint: Get RSA key
 @app.route('/get_rsa', methods=['POST'])

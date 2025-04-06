@@ -188,7 +188,7 @@ class UserManagement:
                     if response.status_code == 200:
                         aes_key = data["aes_key"]
                         print(data["message"])
-                    elif response.status_code == 201:
+                    elif response.status_code == 400:
                         print(data["message"])
                         flag_username = False
                         continue
@@ -279,9 +279,9 @@ class UserManagement:
                     if response.status_code == 200:
                         aes_key = data["aes_key"]
                         print(data["message"])
-                    elif response.status_code == 201:
+                    elif response.status_code == 400:
                         print(data["message"])
-                        continue
+                        return False, None
                     else:
                         print("[ERROR] Server error.")
                         return False, None
@@ -316,22 +316,43 @@ class UserManagement:
         """
         Update the target file by sending new content to server
         """
-        # file flag tests if user has already input a target file, and path flag tests if user finish process
+        files_flag = False
         file_id_flag = False
         file_path_flag = False
+        files = None
         file_id = None
         file_path = None
         aes_key = None
-        while not (file_path_flag and file_id_flag):
-            # Query user for the file id of file to be edited
+        while not (files_flag and file_path_flag and file_id_flag):
+            if not files_flag:
+                try:
+                    response = requests.post(f"{SERVER_URL}/get_files", json={
+                        "username": username
+                        })
+                    data = response.json()
+                    if response.status_code == 200:
+                        files = data["files"]
+                        print(data["message"])
+                    elif response.status_code == 400 or response.status_code == 403:
+                        print(data["message"])
+                        continue
+                    else:
+                        print("[ERROR] Server error.")
+                        return False
+                except requests.exceptions.RequestException as error:
+                    print(f"[ERROR] Network error: {error}.")
+                    return False  
+                files_flag = True      
             if not file_id_flag:
+                print("[FILES] List of files:")
+                for file in files:
+                    print(f"- File ID: {file['file_id']}, File Name: {file['file_name']}, Access: {file['access']}")
                 file_id = input("Please input the file ID for the file to be edited (or type \"q\" to EXIT):\n> ")
                 if file_id == "q":
                     return False
                 if not Utils.check_file_id_regex(file_id):
                     print('[ERROR] Invalid file ID format.')
                     continue
-                # Check if file ID exists
                 file_id_flag = True
             if not file_path_flag:
                 file_path = input("Please input the path of the file to be edited (or type \"q\" to EXIT, \"b\" to BACK):\n> ")
@@ -347,32 +368,31 @@ class UserManagement:
         file_name = os.path.basename(file_path)
         encrypted_file_path = os.path.join("temp", file_name)
         try:
-            response = requests.post(f"{SERVER_URL}/get_aes", json={'username': username})
+            response = requests.post(f"{SERVER_URL}/get_aes_key", json={'username': username})
+            data = response.json()
             if response.status_code == 200:
-                aes_key = response.json()['aes']
-                print(f"[STATUS] AES for '{username}' fetched successfully.")
+                aes_key = data["aes_key"]
+                print(data["message"])
             elif response.status_code == 400:
-                error = response.json()["error"]
-                print(f"[ERROR] {error}")
+                print(data["message"])
                 return False
             else:
                 print("[ERROR] Server error.")
                 return False
-        except requests.exceptions.RequestException as e:
-            print(f"[ERROR] Network error: {e}.")
+        except requests.exceptions.RequestException as error:
+            print(f"[ERROR] Network error: {error}.")
             return False        
         # Process original file and make a temp new file, store the path of new into encrypted_file_path
-        new_content = CryptoManager.encrypt_file_with_aes(password, aes_key, file_path)
-        # Request for the file content from server
-        data = {'username': username, 'file_id': file_id, 'content': new_content}
+        new_content = CryptoManager.encrypt_file_with_aes(password, aes_key, encrypted_file_path)
+        payload = {'username': username, 'file_id': file_id, 'content': new_content}
         try:
-            response = requests.post(f"{SERVER_URL}/edit_file", json=data)
+            response = requests.post(f"{SERVER_URL}/edit_file", json=payload)
+            data = response.json()
             if response.status_code == 200:
                 os.remove(encrypted_file_path)
-                print(f"[STATUS] File '{file_id}' uploaded successfully.")
+                print(data["message"])
             elif response.status_code == 403:
-                error = response.json()["error"]
-                print(f"[ERROR] {error}")
+                print(data["message"])
                 return False
             else:
                 print("[ERROR] Server error.")

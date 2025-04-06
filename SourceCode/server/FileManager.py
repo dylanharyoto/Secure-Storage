@@ -16,15 +16,15 @@ class FileManager:
         self.user_conn = sqlite3.connect(users_db, check_same_thread=False)
         self.user_cursor = self.user_conn.cursor()
 
-    def add_file(self, username, filename, content):
+    def add_file(self, username, file_name, content):
         """
         Add a new file to the system.
         The file is owned by the uploader and its access is set to 'owned'.
         """
         file_id = str(uuid.uuid4())
         self.cursor.execute(
-            "INSERT INTO files (file_id, owner, filename, content, access) VALUES (?, ?, ?, ?, ?)",
-            (file_id, username, filename, content, "owned")
+            "INSERT INTO files (file_id, owner, file_name, content, access) VALUES (?, ?, ?, ?, ?)",
+            (file_id, username, file_name, content, "owned")
         )
         self.conn.commit()
         return file_id
@@ -81,19 +81,19 @@ class FileManager:
         For each entry in share_info, a new row is created in the files table:
           - file_id: New generated ID.
           - owner: The shared user. 
-          - filename: "shared" + original filename.
+          - file_name: "shared" + original file_name.
           - content: The provided shared content.
           - access: "shared".
         """
-        # Retrieve the original file to get its filename and verify ownership.
+        # Retrieve the original file to get its file_name and verify ownership.
         self.cursor.execute(
-            "SELECT owner, filename FROM files WHERE file_id = ? AND access = 'owned'",
+            "SELECT owner, file_name FROM files WHERE file_id = ? AND access = 'owned'",
             (file_id,)
         )
         result = self.cursor.fetchone()
         if not result:
             raise ValueError("Original file not found or not owned by the user.")
-        original_owner, original_filename = result
+        original_owner, original_file_name = result
         if original_owner != username:
             raise PermissionError("You do not have permission to share this file.")
 
@@ -101,10 +101,10 @@ class FileManager:
         new_file_ids = {}
         for shared_user, shared_content in share_info.items():
             new_file_id = str(uuid.uuid4())
-            shared_filename = "shared" + original_filename
+            shared_file_name = "shared" + original_file_name
             self.cursor.execute(
-                "INSERT INTO files (file_id, owner, filename, content, access) VALUES (?, ?, ?, ?, ?)",
-                (new_file_id, shared_user, shared_filename, shared_content, "shared")
+                "INSERT INTO files (file_id, owner, file_name, content, access) VALUES (?, ?, ?, ?, ?)",
+                (new_file_id, shared_user, shared_file_name, shared_content, "shared")
             )
             new_file_ids[shared_user] = new_file_id
         self.conn.commit()
@@ -151,14 +151,14 @@ class FileManager:
     def get_files(self, username):
         """
         Return a list of files for the specified user.
-        Each file is represented as a dictionary with keys: file_id, filename, and access.
+        Each file is represented as a dictionary with keys: file_id, file_name, and access.
         """
         self.cursor.execute(
-            "SELECT file_id, filename, access FROM files WHERE owner = ?",
+            "SELECT file_id, file_name, access FROM files WHERE owner = ?",
             (username,)
         )
         rows = self.cursor.fetchall()
-        files = [{"file_id": fid, "filename": fname, "access": access} for fid, fname, access in rows]
+        files = [{"file_id": fid, "file_name": fname, "access": access} for fid, fname, access in rows]
         return files
 
     def close(self):
