@@ -16,72 +16,62 @@ class FileManager:
         self.user_conn = sqlite3.connect(users_db, check_same_thread=False)
         self.user_cursor = self.user_conn.cursor()
 
-    def _create_files_tables(self):
-        """Creates the tables for file metadata and sharing."""
-        self.cursor.execute("""
-            CREATE TABLE IF NOT EXISTS files (
-                file_id TEXT PRIMARY KEY,
-                owner TEXT NOT NULL,
-                filename TEXT NOT NULL,
-                access TEXT NOT NULL,
-                content BLOB NOT NULL
-            )
-        """)
-        self.conn.commit()
+    @staticmethod
+    def check_file_id(db_conn, username, file_id):
+        cursor = db_conn.cursor()
+        cursor.execute(
+            "SELECT file_id FROM files WHERE file_id = ? AND owner = ?",
+            (file_id, username)
+        )
+        result = cursor.fetchone()
+        return result is not None
 
-    def add_file(self, username, filename, content):
+    @staticmethod
+    def upload_file(db_conn, username, file_name, content):
         """
         Add a new file to the system.
         The file is owned by the uploader and its access is set to 'owned'.
         """
         file_id = str(uuid.uuid4())
-        self.cursor.execute(
-            "INSERT INTO files (file_id, owner, filename, content, access) VALUES (?, ?, ?, ?, ?)",
-            (file_id, username, filename, content, "owned")
+        cursor = db_conn.cursor()
+        cursor.execute(
+            "INSERT INTO files (file_id, owner, file_name, content, access) VALUES (?, ?, ?, ?, ?)",
+            (file_id, username, file_name, content, "owned")
         )
-        self.conn.commit()
+        db_conn.commit()
         return file_id
     
-    def get_user_aes(self, username):
-        """Retrieve aes key for a given username"""
-        self.cursor.execute('''SELECT key FROM users WHERE username = ?''', (username,))
-        user_aes = self.cursor.fetchone()
-        return user_aes
-    
-    def get_user_rsa(self, username):
-        """Retrieve aes key for a given username"""
-        self.cursor.execute('''SELECT pk FROM users WHERE username = ?''', (username,))
-        user_rsa = self.cursor.fetchone()
-        return user_rsa
-
-    def edit_file(self, username, file_id, new_content):
+    @staticmethod
+    def edit_file(db_conn, username, file_id, new_content):
         """
         Edit an existing file's content.
         Only allowed if the file is owned by the requesting user.
         """
-        self.cursor.execute("SELECT owner FROM files WHERE file_id = ?", (file_id,))
-        result = self.cursor.fetchone()
+        cursor = db_conn.cursor()
+        cursor.execute("SELECT owner FROM files WHERE file_id = ?", (file_id,))
+        result = cursor.fetchone()
         if result and result[0] == username:
-            self.cursor.execute(
+            cursor.execute(
                 "UPDATE files SET content = ? WHERE file_id = ?",
                 (new_content, file_id)
             )
-            self.conn.commit()
+            db_conn.commit()
         else:
             raise PermissionError("You do not have permission to edit this file.")
-
-    def delete_file(self, username, file_id):
+        
+    @staticmethod
+    def delete_file(db_conn, username, file_id):
         """Delete a file if the user is the owner."""
-        self.cursor.execute("SELECT owner FROM files WHERE file_id = ?", (file_id,))
-        result = self.cursor.fetchone()
+        cursor = db_conn.cursor()
+        cursor.execute("SELECT owner FROM files WHERE file_id = ?", (file_id,))
+        result = cursor.fetchone()
         if result and result[0] == username:
-            self.cursor.execute("DELETE FROM files WHERE file_id = ?", (file_id,))
-            self.cursor.execute("DELETE FROM shares WHERE file_id = ?", (file_id,))
-            self.conn.commit()
+            cursor.execute("DELETE FROM files WHERE file_id = ?", (file_id,))
+            cursor.commit()
         else:
             raise PermissionError("You do not have permission to delete this file.")
-
-    def share_file(self, username, file_id, share_info):
+    @staticmethod
+    def share_file(db_conn, username, file_id, share_info):
         """
         Share a file with designated users.
         
@@ -94,19 +84,20 @@ class FileManager:
         For each entry in share_info, a new row is created in the files table:
           - file_id: New generated ID.
           - owner: The shared user. 
-          - filename: "shared" + original filename.
+          - file_name: "shared" + original file_name.
           - content: The provided shared content.
           - access: "shared".
         """
-        # Retrieve the original file to get its filename and verify ownership.
-        self.cursor.execute(
-            "SELECT owner, filename FROM files WHERE file_id = ? AND access = 'owned'",
+        # Retrieve the original file to get its file_name and verify ownership.
+        cursor = db_conn.cursor()
+        cursor.execute(
+            "SELECT owner, file_name FROM files WHERE file_id = ? AND access = 'owned'",
             (file_id,)
         )
-        result = self.cursor.fetchone()
+        result = cursor.fetchone()
         if not result:
             raise ValueError("Original file not found or not owned by the user.")
-        original_owner, original_filename = result
+        original_owner, original_file_name = result
         if original_owner != username:
             raise PermissionError("You do not have permission to share this file.")
 
@@ -114,69 +105,70 @@ class FileManager:
         new_file_ids = {}
         for shared_user, shared_content in share_info.items():
             new_file_id = str(uuid.uuid4())
-            shared_filename = "shared" + original_filename
-            self.cursor.execute(
-                "INSERT INTO files (file_id, owner, filename, content, access) VALUES (?, ?, ?, ?, ?)",
-                (new_file_id, shared_user, shared_filename, shared_content, "shared")
+            shared_file_name = "shared" + original_file_name
+            cursor.execute(
+                "INSERT INTO files (file_id, owner, file_name, content, access) VALUES (?, ?, ?, ?, ?)",
+                (new_file_id, shared_user, shared_file_name, shared_content, "shared")
             )
             new_file_ids[shared_user] = new_file_id
-        self.conn.commit()
+        db_conn.commit()
         return new_file_ids
-    
-    def view_file(self, username, file_id):
-        """
-        Retrieve the file's content and the AES key.
-        - If the requester is the owner, the owner's AES key is retrieved.
-        - If the requester is a shared user, the owner's AES key is retrieved.
-        """
-        # Query the file record.
-        self.cursor.execute("SELECT owner, content FROM files WHERE file_id = ?", (file_id,))
-        result = self.cursor.fetchone()
-        if not result:
-            raise ValueError("File not found")
-        owner, content = result
-        
-        # Check access permission.
-        if owner != username:
-            self.cursor.execute(
-                "SELECT 1 FROM shares WHERE file_id = ? AND shared_with = ?",
-                (file_id, username)
-            )
-            if not self.cursor.fetchone():
-                raise PermissionError("You do not have permission to access this file.")
-
-        # Retrieve the AES key from the users table.
-        # For both owner and shared users, the AES key of the file owner is returned.
-        self.user_cursor.execute("SELECT key FROM users WHERE username = ?", (owner,))
-        user_record = self.user_cursor.fetchone()
-        if not user_record:
-            raise ValueError("User record not found for owner")
-        aes_key = user_record[0]
-        return content, aes_key
-
-    def get_users(self):
-        """Return a list of all usernames from the users table."""
-        self.user_cursor.execute("SELECT username FROM users")
-        users = [row[0] for row in self.user_cursor.fetchall()]
-        return users
- 
-
-    def get_files(self, username):
+    @staticmethod
+    def get_files(db_conn, username):
         """
         Return a list of files for the specified user.
-        Each file is represented as a dictionary with keys: file_id, filename, and access.
+        Each file is represented as a dictionary with keys: file_id, file_name, and access.
         """
-        self.cursor.execute(
-            "SELECT file_id, filename, access FROM files WHERE owner = ?",
+        cursor = db_conn.cursor()
+        cursor.execute(
+            "SELECT file_id, file_name, access FROM files WHERE owner = ?",
             (username,)
         )
-        rows = self.cursor.fetchall()
-        files = [{"file_id": fid, "filename": fname, "access": access} for fid, fname, access in rows]
+        rows = cursor.fetchall()
+        files = [{"file_id": fid, "file_name": fname, "access": access} for fid, fname, access in rows]
         return files
-
-    def close(self):
-        """Close the database connection."""
-        self.conn.close()
+    @staticmethod
+    def view_file(db_conn, username, file_id):
+        """
+        Retrieve a file's content.
+        Checks that the file's owner matches the username.
+        Returns a tuple (content, access) if access is permitted.
+        """
+        cursor = db_conn.cursor()
+        cursor.execute(
+            "SELECT owner, content, access FROM files WHERE file_id = ?",
+            (file_id,)
+        )
+        result = cursor.fetchone()
+        if not result:
+            raise ValueError("File not found.")
+        owner, content, access = result
+        if owner != username:
+            raise PermissionError("You do not have permission to access this file.")
+        return content, access
+    @staticmethod
+    def get_users(db_conn):
+        """Return a list of all usernames from the users table."""
+        cursor = db_conn.cursor()
+        cursor.execute("SELECT username FROM users")
+        users = [row[0] for row in cursor.fetchall()]
+        return users
+    
+    @staticmethod
+    def get_aes_key(db_conn, username):
+        """Retrieve aes key for a given username"""
+        cursor = db_conn.cursor()
+        cursor.execute('''SELECT key FROM users WHERE username = ?''', (username,))
+        user_aes = cursor.fetchone()
+        return user_aes
+    
+    @staticmethod
+    def get_rsa_key(db_conn, username):
+        """Retrieve aes key for a given username"""
+        cursor = db_conn.cursor()
+        cursor.execute('''SELECT pk FROM users WHERE username = ?''', (username,))
+        user_rsa = cursor.fetchone()
+        return user_rsa
 
 
 if __name__ == "__main__":
@@ -184,7 +176,7 @@ if __name__ == "__main__":
 
     # Owner uploads a file.
     owner = "alice"
-    original_file_id = fm.add_file(owner, "document.txt", b"This is the original file content.")
+    original_file_id = fm.upload_file(owner, "document.txt", b"This is the original file content.")
     print("Original file ID:", original_file_id)
 
     # Owner shares the file with Bob and Carol.

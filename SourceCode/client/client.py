@@ -1,8 +1,7 @@
 import sys
 import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
-from SourceCode.Client import UserManagement
-
+from SourceCode.Client.ClientIO import ClientIO
 
 log_schema = {
     "log_id": "INTEGER PRIMARY KEY AUTOINCREMENT",
@@ -18,16 +17,18 @@ def run():
         print("4. Exit")
         choice = input("Enter your choice:\n> ").strip()
         if choice == "1":
-            status, recovery_key, secret_key = UserManagement.register_user_IO()
+            status, recovery_key, secret_key = ClientIO.register_user_IO()
             if status and recovery_key and secret_key:
+                print(recovery_key)
+                print(secret_key)
                 print(f"[INFO] Registration sucessful.")
         elif choice == "2":
-            status, username, password = UserManagement.login_user_IO()
+            status, username, password = ClientIO.login_user_IO()
             if status and username and password:
                 print("[INFO] Login successful.")
                 session(username, password)
         elif choice == "3":
-            status, recovery_key = UserManagement.reset_password_IO()
+            status, recovery_key = ClientIO.reset_password_IO()
             if status:
                 print("[INFO] Password reset successful.")
         elif choice == "4":
@@ -39,7 +40,7 @@ def run():
 def session(username, password):
     while True:
         print("\nHome Page:")
-        print("1. View File Storage")
+        print("1. Check File(s)")
         print("2. Upload File")
         print("3. Download File")
         print("4. Edit File")
@@ -48,17 +49,17 @@ def session(username, password):
         print("7. Log Out")
         choice = input("Enter your choice:\n> ").strip()
         if choice == "1":
-            UserManagement.view_file_IO(username)
+            ClientIO.check_file_IO(username)
         elif choice == "2":
-            UserManagement.upload_file_IO(username, password)
+            ClientIO.upload_file_IO(username, password)
         elif choice == "3":
-            UserManagement.download_file_IO(username, password)
+            ClientIO.download_file_IO(username, password)
         elif choice == "4":
-            UserManagement.edit_file_IO(username, password)
+            ClientIO.edit_file_IO(username, password)
         elif choice == "5":
-            UserManagement.delete_file_IO(username)
+            ClientIO.delete_file_IO(username)
         elif choice == "6":
-            UserManagement.share_file_IO(username)
+            ClientIO.share_file_IO(username)
         elif choice == "7":
             print("User Logging Out...")
             break
