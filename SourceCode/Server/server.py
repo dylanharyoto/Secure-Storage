@@ -76,12 +76,14 @@ def register_user():
 
 @app.route('/login_user', methods=['POST'])
 def login_user():
+    # Here, the login_user API is just to retrieved the stored hashA in server users database
     data = request.json
     username = data.get('username')
     password = data.get('password')
+    hashed_password = UserManager.login_user(get_db(USERS_DB), username, password)
     if UserManager.login_user(get_db(USERS_DB), username, password):
-        return jsonify({"message": f"[STATUS] Email '{username}' logged in successfully."}), 200
-    return jsonify({"message": "[ERROR] Incorrect password."}), 201
+        return jsonify({"message":"", "hashed_password": hashed_password}), 200
+    return jsonify({"message": f"[ERROR] {username} has not registered yet."}), 201
 
 @app.route('/reset_password', methods=['POST'])
 def reset_password():
