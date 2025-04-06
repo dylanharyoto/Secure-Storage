@@ -96,8 +96,9 @@ class UserManagement:
                     print('[ERROR] Invalid email format.')
                     continue
                 try:
-                    response = requests.post(f"{SERVER_URL}/check_username", json={"username": username})
-                    
+                    response = requests.post(f"{SERVER_URL}/check_username", json={
+                        "username": username
+                        })
                     data = response.json()
                     if response.status_code == 200:
                         print(data["message"])
@@ -123,7 +124,10 @@ class UserManagement:
                     continue
                 try:
                     hashed_password = CryptoManager.hash_password(password)
-                    response = requests.post(f"{SERVER_URL}/login_user", json={"username": username, "password": hashed_password})
+                    response = requests.post(f"{SERVER_URL}/login_user", json={
+                        "username": username, 
+                        "password": hashed_password
+                        })
                     data = response.json()
                     if response.status_code == 200:
                         print(data["message"])
@@ -159,7 +163,9 @@ class UserManagement:
                     print('[ERROR] Invalid email format.')
                     continue
                 try:
-                    response = requests.post(f"{SERVER_URL}/check_username", json={"username": username})
+                    response = requests.post(f"{SERVER_URL}/check_username", json={
+                        "username": username
+                        })
                     data = response.json()
                     if response.status_code == 200:
                         print(data["message"])
@@ -177,11 +183,11 @@ class UserManagement:
                 try:
                     response = requests.post(f"{SERVER_URL}/get_aes_key", json={
                         "username": username
-                    })
+                        })
                     data = response.json()
                     if response.status_code == 200:
-                        print(data["message"])
                         aes_key = data["aes_key"]
+                        print(data["message"])
                     elif response.status_code == 201:
                         print(data["message"])
                         flag_username = False
@@ -231,7 +237,7 @@ class UserManagement:
                 "username": username, 
                 "new_password": hashed_new_password,
                 "new_aes_key": encrypted_aes_key
-            })
+                })
             data = response.json()
             if response.status_code == 200:
                 print(data["message"])
@@ -248,53 +254,62 @@ class UserManagement:
     @staticmethod
     def upload_file_IO(username, password):
         file_path_flag = False
-        file_id = None
+        aes_key_flag = False
         file_path = None
         aes_key = None
-        while not file_path_flag:
-            file_path = input("Please input the path of the file to be uploaded (or type \"q\" to EXIT):\n> ")
-            if file_path == 'q':
-                return False
-            if not os.path.isfile(file_path):
-                print("[ERROR] Invalid file path or file does not exist.")
-                continue
-            file_path_flag = True
-        file_name = os.path.basename(file_path)
-        encrypted_file_path = os.path.join("temp", file_name)
-        try:
-            response = requests.post(f"{SERVER_URL}/get_aes", json={"username": username})
-            if response.status_code == 200:
-                aes_key = response.json()['aes']
-                print(f"[STATUS] AES for '{username}' fetched successfully.")
-            elif response.status_code == 400:
-                error = response.json()["error"]
-                print(f"[ERROR] {error}")
-                return False
-            else:
-                print("[ERROR] Server error.")
-                return False
-        except requests.exceptions.RequestException as error:
-            print(f"[ERROR] Network error: {error}.")
-            return False
+        file_id = None
+        encrypted_file_path = None
+        while not (file_path_flag and aes_key_flag):
+            if not file_path_flag:
+                file_path = input("Please input the path of the file to be uploaded (or type \"q\" to EXIT):\n> ")
+                if file_path == 'q':
+                    return False, None
+                if not os.path.isfile(file_path):
+                    print("[ERROR] Invalid file path or file does not exist.")
+                    continue
+                file_name = os.path.basename(file_path)
+                encrypted_file_path = os.path.join("temp", file_name)
+                file_path_flag = True
+            if not aes_key_flag:
+                try:
+                    response = requests.post(f"{SERVER_URL}/get_aes_key", json={
+                        "username": username
+                        })
+                    data = response.json()
+                    if response.status_code == 200:
+                        aes_key = data["aes_key"]
+                        print(data["message"])
+                    elif response.status_code == 201:
+                        print(data["message"])
+                        continue
+                    else:
+                        print("[ERROR] Server error.")
+                        return False, None
+                except requests.exceptions.RequestException as error:
+                    print(f"[ERROR] Network error: {error}.")
+                    return False, None
+                aes_key_flag = True
         # Process original file and make a temp new file, store the path of new into encrypted_file_path
-        encrypted_file_data = CryptoManager.encrypt_file_with_aes(password, aes_key, file_path)
+        encrypted_file_data = CryptoManager.encrypt_file_with_aes(password, aes_key, encrypted_file_path)
         files = {'file': encrypted_file_data}
         try:
-            response = requests.post(f"{SERVER_URL}/upload_file", files=files, data={'username': username})
+            response = requests.post(f"{SERVER_URL}/upload_file", 
+                                     files=files, 
+                                     data={'username': username})
+            data = response.json
             if response.status_code == 200:
-                file_id = response.json()
+                file_id = data["file_id"]
                 os.remove(encrypted_file_path)
-                print(f"[STATUS] File '{username}' uploaded successfully.")
+                print(data["message"])
             elif response.status_code == 400:
-                error = response.json()["error"]
-                print(f"[ERROR] {error}")
-                return False
+                print(data["message"])
+                return False, None
             else:
                 print("[ERROR] Server error.")
-                return False
+                return False, None
         except requests.exceptions.RequestException as error:
             print(f"[ERROR] Network error: {error}.")
-            return False
+            return False, None
         return True, file_id
     @staticmethod
     def edit_file_IO(username, password):

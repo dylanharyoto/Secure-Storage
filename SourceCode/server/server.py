@@ -92,9 +92,9 @@ def upload_file():
     username = request.form.get('username')
     file = request.files.get('file')
     if not username or not file:
-        return jsonify({"error": "Missing username or file"}), 400
+        return jsonify({"message": "[ERROR] Missing username or file."}), 400
     file_id = file_manager.add_file(username, file.filename, file.read())
-    return jsonify({"file_id": file_id}), 200
+    return jsonify({"message": f"[STATUS] File '{username}' uploaded successfully.", "file_id": file_id}), 200
 
 # Endpoint: Edit a file (only if owned by the requester)
 @app.route('/edit_file', methods=['POST'])
