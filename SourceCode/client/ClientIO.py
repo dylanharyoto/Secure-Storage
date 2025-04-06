@@ -218,6 +218,7 @@ class ClientIO:
                 flag_new_password2 = True
         encrypted_aes_key, recovery_key = CryptoManager.encrypt_with_aes(new_password1)
         hashed_new_password = CryptoManager.hash_password(new_password1)
+        # ==== New feature, wrap post_request into a static function
         flag_continue, flag_success, _ = RequestManager.post_request(
             endpoint="reset_password",
             data={
@@ -229,6 +230,7 @@ class ClientIO:
         )
         if flag_continue or not flag_success:
             return False, None
+        # ==== New feature, wrap post_request into a static function
         return True, recovery_key
     @staticmethod
     def upload_file_IO(username, password):
@@ -249,44 +251,30 @@ class ClientIO:
                     continue
                 file_path_flag = True
             if not aes_key_flag:
-                try:
-                    response = requests.post(f"{SERVER_URL}/get_aes_key", json={
-                        "username": username
-                        })
-                    if response.status_code == 200:
-                        response_data = response.json()
-                        aes_key = response_data["aes_key"]
-                        print(response_data["message"])
-                    elif response.status_code in [400, 401, 403]:
-                        response_data = response.json()
-                        print(response_data["message"])
-                        return False, None
-                    else:
-                        print("[ERROR] Server error.")
-                        return False, None
-                except requests.exceptions.RequestException as error:
-                    print(f"[ERROR] Network error: {error}.")
+                # ==== New feature, wrap post_request into a static function
+                flag_continue, flag_success, data = RequestManager.post_request(
+                    endpoint="get_aes_key",
+                    data={"username": username},
+                    success_codes=[200],
+                    return_data_keys=["aes_key"]
+                )
+                if flag_continue or not flag_success:
                     return False, None
+                aes_key = data["aes_key"]
+                # ==== New feature, wrap post_request into a static function
                 aes_key_flag = True
         encrypted_file_data = CryptoManager.encrypt_file_with_aes(password, aes_key, file_path) 
         files = {'file': encrypted_file_data} # files = {'file': (os.path.basename(file_path), encrypted_file_data)}
-        try:
-            response = requests.post(f"{SERVER_URL}/upload_file", 
-                                     files=files, 
-                                     data={'username': username})
-            data = response.json
-            if response.status_code == 200:
-                file_id = data["file_id"]
-                print(data["message"])
-            elif response.status_code in [400, 403]:
-                print(data["message"])
-                return False, None
-            else:
-                print("[ERROR] Server error.")
-                return False, None
-        except requests.exceptions.RequestException as error:
-            print(f"[ERROR] Network error: {error}.")
+        flag_continue, flag_success, data = RequestManager.post_request(
+            endpoint="upload_file",
+            data={'username': username},
+            files=files,
+            success_codes=[200],
+            return_data_keys=["file_id"]
+        )
+        if flag_continue or not flag_success:
             return False, None
+        file_id = data["file_id"]
         return True, file_id
     @staticmethod
     def edit_file_IO(username, password):
@@ -299,24 +287,15 @@ class ClientIO:
         aes_key = None
         while not (files_flag and file_path_flag and file_id_flag):
             if not files_flag:
-                try:
-                    response = requests.post(f"{SERVER_URL}/get_files", json={
-                        "username": username
-                        })
-                    if response.status_code == 200:
-                        response_data = response.json()
-                        files = response_data["files"]
-                        print(response_data["message"])
-                    elif response.status_code in [400, 403]:
-                        response_data = response.json()
-                        print(response_data["message"])
-                        return False
-                    else:
-                        print("[ERROR] Server error.")
-                        return False
-                except requests.exceptions.RequestException as error:
-                    print(f"[ERROR] Network error: {error}.")
-                    return False  
+                flag_continue, flag_success, data = RequestManager.post_request(
+                    endpoint="get_files",
+                    data={"username": username},
+                    success_codes=[200],
+                    return_data_keys=["files"]
+                )
+                if flag_continue or not flag_success:
+                    return False
+                files = data["files"]
                 files_flag = True      
             if not file_id_flag:
                 print("[FILES] List of files:")
@@ -328,28 +307,16 @@ class ClientIO:
                 if not Utils.check_file_id_regex(file_id):
                     print('[ERROR] Invalid file ID format.')
                     continue
-                try:
-                    response = requests.post(f"{SERVER_URL}/check_file_id", json={
-                        "username": username, 
-                        "file_id": file_id
-                        })
-                    if response.status_code == 200:
-                        response_data = response.json()
-                        print(response_data["message"])
-                    elif response.status_code == 201:
-                        response_data = response.json()
-                        print(response_data["message"])
-                        continue
-                    elif response.status_code in [400, 401]:
-                        response_data = response.json()
-                        print(response_data["message"])
-                        return False
-                    else:
-                        print("[ERROR] Server error.")
-                        return False
-                except requests.exceptions.RequestException as error:
-                    print(f"[ERROR] Network error: {error}.")
-                    return False     
+                flag_continue, flag_success, _ = RequestManager.post_request(
+                    endpoint="check_file_id",
+                    data={"username": username, "file_id": file_id},
+                    success_codes=[200],
+                    retry_codes=[201]
+                )
+                if flag_continue:
+                    continue
+                elif not flag_success:
+                    return False  
                 file_id_flag = True
             if not file_path_flag:
                 file_path = input("Please input the path of the file to be edited (or type \"q\" to EXIT, \"b\" to BACK):\n> ")
@@ -362,38 +329,23 @@ class ClientIO:
                     print("[ERROR] Invalid file path or file does not exist.")
                     continue
                 file_path_flag = True
-        try:
-            response = requests.post(f"{SERVER_URL}/get_aes_key", json={'username': username})
-            if response.status_code == 200:
-                response_data = response.json()
-                aes_key = response_data["aes_key"]
-                print(response_data["message"])
-            elif response.status_code == [400, 401, 403]:
-                response_data = response.json()
-                print(response_data["message"])
-                return False
-            else:
-                print("[ERROR] Server error.")
-                return False
-        except requests.exceptions.RequestException as error:
-            print(f"[ERROR] Network error: {error}.")
-            return False        
+        flag_continue, flag_success, data = RequestManager.post_request(
+            endpoint="get_aes_key",
+            data={'username': username},
+            success_codes=[200],
+            return_data_keys=["aes_key"]
+        )
+        if flag_continue or not flag_success:
+            return False
+        aes_key = data["aes_key"] 
         new_content = CryptoManager.encrypt_file_with_aes(password, aes_key, file_path)
         payload = {'username': username, 'file_id': file_id, 'content': new_content}
-        try:
-            response = requests.post(f"{SERVER_URL}/edit_file", json=payload)
-            if response.status_code == 200:
-                response_data = response.json()
-                print(response_data["message"])
-            elif response.status_code in [400, 403]:
-                response_data = response.json()
-                print(response_data["message"])
-                return False
-            else:
-                print("[ERROR] Server error.")
-                return False
-        except requests.exceptions.RequestException as error:
-            print(f"[ERROR] Network error: {error}.")
+        flag_continue, flag_success, _ = RequestManager.post_request(
+            endpoint="edit_file",
+            data=payload,
+            success_codes=[200]
+        )
+        if flag_continue or not flag_success:
             return False
         return True
     @staticmethod
@@ -407,44 +359,24 @@ class ClientIO:
             if not Utils.check_file_id_regex(file_id):
                 print('[ERROR] Invalid file ID format.')
                 continue
-            try:
-                response = requests.post(f"{SERVER_URL}/check_file_id", json={
-                    "username": username, 
-                    "file_id": file_id
-                    })
-                if response.status_code == 200:
-                    response_data = response.json()
-                    print(response_data["message"])
-                elif response.status_code == 201:
-                    response_data = response.json()
-                    print(response_data["message"])
-                    continue
-                elif response.status_code in [400, 401]:
-                    response_data = response.json()
-                    print(response_data["message"])
-                    return False
-                else:
-                    print("[ERROR] Server error.")
-                    return False
-            except requests.exceptions.RequestException as error:
-                print(f"[ERROR] Network error: {error}.")
+            flag_continue, flag_success, _ = RequestManager.post_request(
+                endpoint="check_file_id",
+                data={"username": username, "file_id": file_id},
+                success_codes=[200],
+                retry_codes=[201]
+            )
+            if flag_continue:
+                continue
+            elif not flag_success:
                 return False
             file_id_flag = True
         payload = {'username': username, 'file_id': file_id}
-        try:
-            response = requests.post(f"{SERVER_URL}/delete_file", json=payload)
-            if response.status_code == 200:
-                response_data = response.json()
-                print(response_data["message"])
-            elif response.status_code in [400, 403]:
-                response_data = response.json()
-                print(response_data["message"])
-                return False 
-            else:
-                print("[ERROR] Server error.")
-                return False       
-        except requests.exceptions.RequestException as error:
-            print(f"[ERROR] Network error: {error}.")
+        flag_continue, flag_success, _ = RequestManager.post_request(
+            endpoint="delete_file",
+            data=payload,
+            success_codes=[200]
+        )
+        if flag_continue or not flag_success:
             return False
         return True
     @staticmethod
@@ -459,24 +391,15 @@ class ClientIO:
         selected_usernames_id = None
         selected_usernames = []
         available_usernames = []
-        try:
-            response = requests.post(f"{SERVER_URL}/get_users")
-            if response.status_code == 200:
-                response_data = response.json()
-                usernames = response_data["usernames"]
-                available_usernames = usernames.split(',').sort()
-                available_usernames.remove(username)
-                print(response_data["message"])
-            elif response.status_code == 403:
-                response_data = response.json()
-                print(response_data["message"])
-                return False
-            else:
-                print("[ERROR] Server error.")
-                return False  
-        except requests.exceptions.RequestException as error:
-            print(f"[ERROR] Network error: {error}.")
+        flag_continue, flag_success, data = RequestManager.post_request(
+            endpoint="get_users",
+            success_codes=[200],
+            return_data_keys=["usernames"]
+        )
+        if flag_continue or not flag_success:
             return False
+        usernames = data["usernames"].split(',')
+        available_usernames = sorted([u for u in usernames if u != username])
         while not (file_id_flag and selected_usernames_id_flag):
             if not file_id_flag:
                 file_id = input("Please input the file ID for the file to be shared (or type \"q\" to EXIT):\n> ")
@@ -485,27 +408,15 @@ class ClientIO:
                 if not Utils.check_file_id_regex(file_id):
                     print('[ERROR] Invalid file ID format.')
                     continue
-                try:
-                    response = requests.post(f"{SERVER_URL}/check_file_id", json={
-                        "username": username, 
-                        "file_id": file_id
-                        })
-                    if response.status_code == 200:
-                        response_data = response.json()
-                        print(response_data["message"])
-                    elif response.status_code == 201:
-                        response_data = response.json()
-                        print(response_data["message"])
-                        continue
-                    elif response.status_code in [400, 401]:
-                        response_data = response.json()
-                        print(response_data["message"])
-                        return False
-                    else:
-                        print("[ERROR] Server error.")
-                        return False
-                except requests.exceptions.RequestException as error:
-                    print(f"[ERROR] Network error: {error}.")
+                flag_continue, flag_success, _ = RequestManager.post_request(
+                    endpoint="check_file_id",
+                    data={"username": username, "file_id": file_id},
+                    success_codes=[200],
+                    retry_codes=[201]
+                )
+                if flag_continue:
+                    continue
+                elif not flag_success:
                     return False
                 file_id_flag = True
             if not selected_usernames_id_flag:
@@ -616,27 +527,15 @@ class ClientIO:
                 if not Utils.check_file_id_regex(file_id):
                     print('[ERROR] Invalid file ID format.')
                     continue
-                try:
-                    response = requests.post(f"{SERVER_URL}/check_file_id", json={
-                        "username": username, 
-                        "file_id": file_id
-                        })
-                    if response.status_code == 200:
-                        response_data = response.json()
-                        print(response_data["message"])
-                    elif response.status_code == 201:
-                        response_data = response.json()
-                        print(response_data["message"])
-                        continue
-                    elif response.status_code in [400, 401]:
-                        response_data = response.json()
-                        print(response_data["message"])
-                        return False
-                    else:
-                        print("[ERROR] Server error.")
-                        return False
-                except requests.exceptions.RequestException as error:
-                    print(f"[ERROR] Network error: {error}.")
+                flag_continue, flag_success, _ = RequestManager.post_request(
+                    endpoint="check_file_id",
+                    data={"username": username, "file_id": file_id},
+                    success_codes=[200],
+                    retry_codes=[201]
+                )
+                if flag_continue:
+                    continue
+                elif not flag_success:
                     return False
                 file_id_flag = True
             if not (file_path_flag):
@@ -649,22 +548,15 @@ class ClientIO:
                 if not os.path.isfile(file_path):
                     print("[ERROR] Invalid file path or file does not exist.")
                     continue
-                payload = {'username': username, 'file_id': file_id}
-                try:
-                    response = requests.post(f"{SERVER_URL}/view_file", json=payload)
-                    if response.status_code == 200:
-                        fetched_file = response.json()
-                        print(f"[STATUS] File '{file_id}' fetched successfully.")
-                    elif response.status_code in [400, 403]:
-                        response_data = response.json()
-                        print(response_data["message"])
-                        return False
-                    else:
-                        print("[ERROR] Server error.")
-                        return False
-                except requests.exceptions.RequestException as error:
-                    print(f"[ERROR] Network error: {error}.")
-                    return None
+                flag_continue, flag_success, data = RequestManager.post_request(
+                    endpoint="view_file",
+                    data={'username': username, 'file_id': file_id},
+                    success_codes=[200],
+                    return_data_keys=["access", "content"]
+                )
+                if flag_continue or not flag_success:
+                    return False
+                fetched_file = data
                 file_path_flag = True
             if not (secret_key_flag):
                 if fetched_file['access'] == 'shared':
@@ -676,16 +568,13 @@ class ClientIO:
                         continue
                     CryptoManager.decrypt_shared_file(secret_key, fetched_file['content'], file_path)
                 else:
-                    response = requests.post(f"{SERVER_URL}/get_aes_key", json={'username': username})
-                    if response.status_code == 200:
-                        response_data = response.json()
-                        print(response_data["message"])
-                    elif response.status_code in [400, 401, 403]:
-                        response_data = response.json()
-                        print(response_data["message"])
-                        return False
-                    else:
-                        print("[ERROR] Server error.")
+                    flag_continue, flag_success, data = RequestManager.post_request(
+                        endpoint="get_aes_key",
+                        data={'username': username},
+                        success_codes=[200],
+                        return_data_keys=["aes_key"]
+                    )
+                    if flag_continue or not flag_success:
                         return False
                     CryptoManager.decrypt_file_with_aes(password, data["aes_key"], fetched_file['content'], file_path)
                 secret_key_flag = True
@@ -696,21 +585,15 @@ class ClientIO:
         Fetch all file names in the storages that this client can read.
         """
         files = None
-        try:
-            response = requests.post(f"{SERVER_URL}/get_files", json={"username": username})
-            if response.status_code == 200:
-                fetched_files = response.json()
-                files = fetched_files['files']
-                print(fetched_files["message"])
-                for i in range(len(files)):
-                    print(f"{i + 1}. {files[i]}")
-            elif response.status_code == [400, 403]:
-                response_data = response.json()
-                print(response_data["message"])
-                return False
-            else:
-                print("[ERROR] Server error.")
-                return False
-        except requests.exceptions.RequestException as error:
-            print(f"[ERROR] Network error: {error}.")
+        flag_continue, flag_success, data = RequestManager.post_request(
+            endpoint="get_files",
+            data={"username": username},
+            success_codes=[200],
+            return_data_keys=["files"]
+        )
+        if flag_continue or not flag_success:
+            return False
+        files = data["files"]
+        for i in range(len(files)):
+            print(f"{i + 1}. {files[i]}")
         return True
