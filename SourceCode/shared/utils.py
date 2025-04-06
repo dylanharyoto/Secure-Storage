@@ -3,12 +3,12 @@ import bcrypt
 import re
 class Utils:
     @staticmethod
-    def init_database(db_file_name, table_name, schema):
+    def init_db(db_file_name, table_name, schema):
         """Initialize the database and create the specified table if it does not exist."""
         conn = sqlite3.connect(db_file_name)
         cursor = conn.cursor()
+        columns = [f"{col_name} {col_type}" for col_name, col_type in schema.items()]
         try:
-            columns = [f"{col_name} {col_type}" for col_name, col_type in schema.items()]
             cursor.execute(f'''
                 CREATE TABLE IF NOT EXISTS {table_name} (
                     {', '.join(columns)}

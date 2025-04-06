@@ -7,13 +7,7 @@ from SourceCode.Shared.Utils import Utils
 from SourceCode.Server.FileManager import FileManager
 from SourceCode.Server.UserManager import UserManager
 
-
-app = Flask(__name__)
-app.config['USERS_DATABASE'] = os.path.join(os.path.dirname(__file__), "data", "Users.db")
-app.config['FILES_DATABASE'] = os.path.join(os.path.dirname(__file__), "data", "Files.db")
-file_manager = FileManager()
-os.makedirs(os.path.dirname(app.config['USERS_DATABASE']), exist_ok=True)
-os.makedirs(os.path.dirname(app.config['FILES_DATABASE']), exist_ok=True)
+# Table Schemas
 users_schema = {
     "username": "TEXT PRIMARY KEY",
     "password": "TEXT NOT NULL",
@@ -27,9 +21,17 @@ files_schema = {
     "access": "TEXT NOT NULL",
     "content": "BLOB NOT NULL"
 }
-Utils.init_database(app.config['USERS_DATABASE'], "Users", users_schema)
-Utils.init_database(app.config['FILES_DATABASE'], "Files", files_schema)
+# Table Schemas
 
+# Initialization
+app = Flask(__name__)
+app.config['USERS_DB'] = os.path.join(os.path.dirname(__file__), "data", "Users.db")
+app.config['FILES_DB'] = os.path.join(os.path.dirname(__file__), "data", "Files.db")
+os.makedirs(os.path.dirname(app.config['USERS_DB']), exist_ok=True)
+os.makedirs(os.path.dirname(app.config['FILES_DB']), exist_ok=True)
+Utils.init_db(app.config['USERS_DB'], "Users", users_schema)
+Utils.init_db(app.config['FILES_DB'], "Files", files_schema)
+# Initialization
 
 def get_db(config_key):
     """Get a database connection for the current request."""
@@ -42,7 +44,7 @@ def get_db(config_key):
 def close_db():
     """Close the database connection at the end of each request."""
     for attr in list(g.__dict__.keys()):
-        if attr.startswith("db_"):
+        if attr.endswith("_db"):
             getattr(g, attr).close()
             delattr(g, attr)
 
@@ -50,7 +52,7 @@ def close_db():
 def check_username():
     data = request.json
     username = data.get('username')
-    if UserManager.check_username(get_db('USERS_DATABASE'), username):
+    if UserManager.check_username(get_db('USERS_DB'), username):
         return jsonify({"message": "[STATUS] Email exists."}), 200
     return jsonify({"message": "[STATUS] Email does not exist yet."}), 201
 
@@ -61,7 +63,7 @@ def register_user():
     password = data.get('password')
     encrypted_aes_key = data.get('encrypted_aes_key')
     public_key = data.get('public_key')
-    if UserManager.register_user(get_db("USERS_DATABASE"), username, password, encrypted_aes_key, public_key):
+    if UserManager.register_user(get_db("USERS_DB"), username, password, encrypted_aes_key, public_key):
         return jsonify({"message": f"[STATUS] Email '{username}' registered successfully."}), 200
     return jsonify({"message": f"[ERROR] Email '{username}' failed to be registered."}), 400
     
@@ -71,7 +73,7 @@ def login_user():
     data = request.json
     username = data.get('username')
     password = data.get('password')
-    if UserManager.login_user(get_db("USERS_DATABASE"), username, password):
+    if UserManager.login_user(get_db("USERS_DB"), username, password):
         return jsonify({"message": f"[STATUS] Email '{username}' logged in successfully."}), 200
     return jsonify({"message": "[ERROR] Incorrect password."}), 201
 
@@ -82,7 +84,7 @@ def reset_password():
     new_password = data.get('new_password')
     new_aes_key = data.get('new_aes_key')
     #new_hashed_password = Utils.hash_password(new_password)
-    if UserManager.reset_password(get_db("USERS_DATABASE"), username, new_password, new_aes_key):
+    if UserManager.reset_password(get_db("USERS_DB"), username, new_password, new_aes_key):
         return jsonify({"message": f"[STATUS] Password for '{username}' reset successfully."}), 200
     return jsonify({"message": f"[ERROR] Password for '{username}' failed to be reset."}), 400
 
@@ -94,7 +96,7 @@ def upload_file():
     if not (username and file):
         return jsonify({"message": "[ERROR] Missing username or file."}), 400
     try:
-        file_id = file_manager.add_file(username, file.file_name, file.read()) # change file.filename to file.file_name
+        file_id = FileManager.upload_file(get_db("FILES_DB"), username, file.file_name, file.read()) # change file.filename to file.file_name
     except Exception as error:
         return jsonify({"message": f"[ERROR] {str(error)}."}), 403
     return jsonify({"message": f"[STATUS] File '{username}' uploaded successfully.", "file_id": file_id}), 200
@@ -108,7 +110,7 @@ def edit_file():
     if not (username and file_id and new_content):
         return jsonify({"message": "[ERROR] Missing username or file_id or new_content."}), 400
     try:
-        file_manager.edit_file(username, file_id, new_content.encode()) # to be chnaged when file_manager is static
+        FileManager.edit_file(username, file_id, new_content.encode()) # to be chnaged when FileManager is static
     except Exception as error:
         return jsonify({"message": f"[ERROR] {str(error)}."}), 403
     return jsonify({"message": "f[STATUS] File '{file_id}' uploaded successfully."}), 200
@@ -121,7 +123,7 @@ def delete_file():
     if not (username and file_id):
         return jsonify({"message": "[ERROR] Missing username or file_id."}), 400
     try:
-        file_manager.delete_file(username, file_id) # to be chnaged when file_manager is static
+        FileManager.delete_file(get_db("FILES_DB"), username, file_id) # to be chnaged when FileManager is static
     except Exception as error:
         return jsonify({"message": f"[ERROR] {str(error)}."}), 403
     return jsonify({"message": f"[STATUS] File '{file_id}' deleted successfully."}), 200
@@ -146,7 +148,7 @@ def share_file():
     if not (username and file_id and share_info):
         return jsonify({"message": "[ERROR] Missing username or file_id or share_info."}), 400
     try:
-        new_ids = file_manager.share_file(username, file_id, share_info) # to be chnaged when file_manager is static
+        new_ids = FileManager.share_file(get_db("FILES_DB"), username, file_id, share_info) # to be chnaged when FileManager is static
         return jsonify({"message":"", "shared_file_ids": new_ids}), 200
     except Exception as error:
         return jsonify({"message": f"[ERROR] {str(error)}."}), 403
@@ -158,7 +160,7 @@ def get_files():
     if not username:
         return jsonify({"message": "[ERROR] Missing username."}), 400
     try:
-        files = file_manager.get_files(username)
+        files = FileManager.get_files(get_db("FILES_DB"), username)
     except Exception as error:
         return jsonify({"message": f"[ERROR] {str(error)}."}), 403
     return jsonify({"message": f"[STATUS] Files for {username} fetched successfully.", "files": files}), 200
@@ -171,7 +173,7 @@ def view_file():
     if not (username and file_id):
         return jsonify({"message": "[ERROR] Missing username or file_id."}), 400
     try:
-        content, access = file_manager.view_file(username, file_id)
+        content, access = FileManager.view_file(get_db("FILES_DB"), username, file_id)
         # Assuming text content; adjust if binary data (e.g., use base64 encoding)
     except Exception as error:
         return jsonify({"message": f"[ERROR] {str(error)}."}), 403
@@ -182,7 +184,7 @@ def view_file():
 def get_users():
     usernames = None
     try:
-        usernames = file_manager.get_users()
+        usernames = FileManager.get_users(get_db("USERS_DB"))
     except Exception as error:
         return jsonify({"message": f"[ERROR] {str(error)}."}), 403
     usernames = ",".join(usernames)
@@ -196,7 +198,7 @@ def get_aes_key():
     if not (username):
         return jsonify({"message": "[ERROR] Missing username."}), 400
     try:
-        aes_key = file_manager.get_aes_key(username) # to be changed when file_manager is static
+        aes_key = FileManager.get_aes_key(get_db("USERS_DB"), username) # to be changed when FileManager is static
     except Exception as error:
         return jsonify({"message": f"[ERROR] {str(error)}."}), 403
     if not aes_key:
@@ -210,7 +212,7 @@ def get_rsa_key():
     if not (username):
         return jsonify({"message": "[ERROR] Missing username."}), 400
     try:
-        rsa_key = file_manager.get_rsa_key(username) # to be changed when file_manager is static
+        rsa_key = FileManager.get_rsa_key(get_db("USERS_DB"), username) # to be changed when FileManager is static
     except Exception as error:
         return jsonify({"message": f"[ERROR] {str(error)}."}), 403
     if not rsa_key:
