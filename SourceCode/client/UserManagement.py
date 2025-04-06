@@ -141,14 +141,16 @@ class UserManagement:
     @staticmethod
     def reset_password_IO():
         flag_username = False
+        flag_aes_key = False
         flag_recovery_key = False
         flag_new_password1 = False
         flag_new_password2 = False
         username = None
+        aes_key = None
         recovery_key = None
         new_password1 = None
         new_password2 = None
-        while not (flag_username and flag_recovery_key and flag_new_password1 and flag_new_password2):
+        while not (flag_username and flag_aes_key and flag_recovery_key and flag_new_password1 and flag_new_password2):
             if not flag_username:
                 username = input('Enter your email address (or type "q" to EXIT):\n> ').strip()
                 if username == "q":
@@ -171,28 +173,18 @@ class UserManagement:
                     print(f"[ERROR] Network error: {error}")
                     return False, None
                 flag_username = True
-            if not flag_recovery_key:
-                recovery_key = input('Enter your recovery key (or type "q" to EXIT, "b" to BACK):\n> ').strip()
-                if recovery_key == "q":
-                    return False, None
-                if recovery_key == "b":
-                    flag_username = False
-                    continue
+            if not flag_aes_key:
                 try:
                     response = requests.post(f"{SERVER_URL}/get_aes_key", json={
                         "username": username
                     })
                     data = response.json()
                     if response.status_code == 200:
+                        print(data["message"])
                         aes_key = data["aes_key"]
-                        key_verification_result = CryptoManager.verify_recovery_key(recovery_key, aes_key)
-                        if key_verification_result[0]:
-                            verified_recovery_key = key_verification_result[1]
-                        else:
-                            print("[ERROR] Validation failed. Recovery key is incorrect.")
-                            continue
                     elif response.status_code == 201:
                         print(data["message"])
+                        flag_username = False
                         continue
                     else:
                         print("[ERROR] Server error.")
@@ -200,6 +192,18 @@ class UserManagement:
                 except requests.exceptions.RequestException as error:
                     print(f"[ERROR] Network error: {error}")     
                     return False, None
+                flag_aes_key = True
+            if not flag_recovery_key:
+                recovery_key = input('Enter your recovery key (or type "q" to EXIT, "b" to BACK):\n> ').strip()
+                if recovery_key == "q":
+                    return False, None
+                if recovery_key == "b":
+                    flag_username = False
+                    continue
+                if not CryptoManager.verify_recovery_key(recovery_key, aes_key):
+                    print("[ERROR] Validation failed. Recovery key is incorrect.")
+                    continue
+                print("[STATUS] Validation succeed. Recovery key is correct.")
                 flag_recovery_key = True
             if not flag_new_password1:
                 new_password1 = input('Enter a new password with at least 8 characters (or type "q" to EXIT):\n> ').strip()

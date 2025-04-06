@@ -188,7 +188,7 @@ def get_aes_key():
     aes_key = file_manager.get_aes_key(username) # to be changed when file_manager is static
     if aes_key:
         return jsonify({"message": f"[STATUS] AES key for {username} exists.", "aes_key": aes_key}), 200
-    return jsonify({"message": f"[ERROR] AES key for {username} is not found"}), 201
+    return jsonify({"message": f"[ERROR] AES key for {username} is not found."}), 201
 
 # Endpoint: Get RSA key
 @app.route('/get_rsa', methods=['POST'])

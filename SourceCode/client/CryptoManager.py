@@ -78,7 +78,7 @@ class CryptoManager:
         cipher = AES.new(recovery_key, AES.MODE_CBC, key_iv)
         combined_key = unpad(cipher.decrypt(encrypted_aes_key), AES.block_size)
         if combined_key[:4] == b"true":
-            return True, recovery_key
+            return True
         else:
             print("Invalid password")
             return False
