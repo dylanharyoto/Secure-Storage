@@ -17,7 +17,8 @@ class UserManagement:
         encrypted_aes_key = None
         recovery_key = None
         secret_key = None
-        public_key = None        
+        public_key = None       
+        hashed_password = None 
         while not (flag_username and flag_password1 and flag_password2):
             if not flag_username:
                 username = input('Enter your email address (or type "q" to EXIT):\n> ').strip()
@@ -63,11 +64,16 @@ class UserManagement:
                     print("[ERROR] Passwords do not match.")
                     continue
                 flag_password2 = True
+        encrypted_aes_key, recovery_key = CryptoManager.encrypt_with_aes(password1)
+        secret_key, public_key = CryptoManager.generate_rsa_key_pair()
+        hashed_password = CryptoManager.hash_password(password1)
         try:
-            encrypted_aes_key, recovery_key = CryptoManager.encrypt_with_aes(password1)
-            secret_key, public_key = CryptoManager.generate_rsa_key_pair()
-            hashed_password = CryptoManager.hash_password(password1)
-            response = requests.post(f"{SERVER_URL}/register_user", json={"username": username, "password": hashed_password, "encrypted_aes_key": encrypted_aes_key, "public_key": public_key})
+            response = requests.post(f"{SERVER_URL}/register_user", json={
+                "username": username, 
+                "password": hashed_password, 
+                "encrypted_aes_key": encrypted_aes_key, 
+                "public_key": public_key
+                })
             data = response.json()
             if response.status_code == 200:
                 print(data["message"])
@@ -87,6 +93,7 @@ class UserManagement:
         flag_password = False
         username = None
         password = None
+        hashed_password = None
         while not (flag_username and flag_password):
             if not flag_username:
                 username = input('Enter your email address (or type "q" to EXIT):\n> ').strip()
@@ -122,8 +129,8 @@ class UserManagement:
                 if not Utils.check_password_regex(password):
                     print("[ERROR] Password must be at least 8 characters long.")
                     continue
+                hashed_password = CryptoManager.hash_password(password)
                 try:
-                    hashed_password = CryptoManager.hash_password(password)
                     response = requests.post(f"{SERVER_URL}/login_user", json={
                         "username": username, 
                         "password": hashed_password
@@ -154,6 +161,9 @@ class UserManagement:
         recovery_key = None
         new_password1 = None
         new_password2 = None
+        encrypted_aes_key = None
+        recovery_key = None
+        hashed_new_password = None
         while not (flag_username and flag_aes_key and flag_recovery_key and flag_new_password1 and flag_new_password2):
             if not flag_username:
                 username = input('Enter your email address (or type "q" to EXIT):\n> ').strip()
@@ -192,6 +202,9 @@ class UserManagement:
                         print(data["message"])
                         flag_username = False
                         continue
+                    elif response.status_code in [401, 403]:
+                        print(data["message"])
+                        return False, None
                     else:
                         print("[ERROR] Server error.")
                         return False, None
@@ -230,9 +243,9 @@ class UserManagement:
                     print("[ERROR] Passwords do not match.")
                     continue
                 flag_new_password2 = True
+        encrypted_aes_key, recovery_key = CryptoManager.encrypt_with_aes(new_password1)
+        hashed_new_password = CryptoManager.hash_password(new_password1)
         try:
-            encrypted_aes_key, recovery_key = CryptoManager.encrypt_with_aes(new_password1)
-            hashed_new_password = CryptoManager.hash_password(new_password1)
             response = requests.post(f"{SERVER_URL}/reset_password", json={
                 "username": username, 
                 "new_password": hashed_new_password,
@@ -259,6 +272,8 @@ class UserManagement:
         aes_key = None
         file_id = None
         encrypted_file_path = None
+        encrypted_file_data = None
+        files = None
         while not (file_path_flag and aes_key_flag):
             if not file_path_flag:
                 file_path = input("Please input the path of the file to be uploaded (or type \"q\" to EXIT):\n> ")
@@ -267,8 +282,7 @@ class UserManagement:
                 if not os.path.isfile(file_path):
                     print("[ERROR] Invalid file path or file does not exist.")
                     continue
-                file_name = os.path.basename(file_path)
-                encrypted_file_path = os.path.join("temp", file_name)
+                encrypted_file_path = os.path.join("temp", os.path.basename(file_path)) # os.path.basename(file_path) = file_name
                 file_path_flag = True
             if not aes_key_flag:
                 try:
@@ -279,7 +293,7 @@ class UserManagement:
                     if response.status_code == 200:
                         aes_key = data["aes_key"]
                         print(data["message"])
-                    elif response.status_code == 400:
+                    elif response.status_code in [400, 401, 403]:
                         print(data["message"])
                         return False, None
                     else:
@@ -301,7 +315,7 @@ class UserManagement:
                 file_id = data["file_id"]
                 os.remove(encrypted_file_path)
                 print(data["message"])
-            elif response.status_code == 400:
+            elif response.status_code in [400, 403]:
                 print(data["message"])
                 return False, None
             else:
@@ -313,9 +327,6 @@ class UserManagement:
         return True, file_id
     @staticmethod
     def edit_file_IO(username, password):
-        """
-        Update the target file by sending new content to server
-        """
         files_flag = False
         file_id_flag = False
         file_path_flag = False
@@ -323,6 +334,7 @@ class UserManagement:
         file_id = None
         file_path = None
         aes_key = None
+        encrypted_file_path = None
         while not (files_flag and file_path_flag and file_id_flag):
             if not files_flag:
                 try:
@@ -333,9 +345,9 @@ class UserManagement:
                     if response.status_code == 200:
                         files = data["files"]
                         print(data["message"])
-                    elif response.status_code == 400 or response.status_code == 403:
+                    elif response.status_code in [400, 403]:
                         print(data["message"])
-                        continue
+                        return False
                     else:
                         print("[ERROR] Server error.")
                         return False
@@ -365,15 +377,14 @@ class UserManagement:
                     print("[ERROR] Invalid file path or file does not exist.")
                     continue
                 file_path_flag = True
-        file_name = os.path.basename(file_path)
-        encrypted_file_path = os.path.join("temp", file_name)
+        encrypted_file_path = os.path.join("temp", os.path.basename(file_path)) # os.path.basename(file_path) = file_name
         try:
             response = requests.post(f"{SERVER_URL}/get_aes_key", json={'username': username})
             data = response.json()
             if response.status_code == 200:
                 aes_key = data["aes_key"]
                 print(data["message"])
-            elif response.status_code == 400:
+            elif response.status_code == [400, 401, 403]:
                 print(data["message"])
                 return False
             else:
@@ -391,7 +402,7 @@ class UserManagement:
             if response.status_code == 200:
                 os.remove(encrypted_file_path)
                 print(data["message"])
-            elif response.status_code == 403:
+            elif response.status_code in [400, 403]:
                 print(data["message"])
                 return False
             else:
@@ -403,9 +414,6 @@ class UserManagement:
         return True
     @staticmethod
     def delete_file_IO(username):
-        """
-        Delete the target file from server storage
-        """
         file_id_flag = False
         file_id = None
         while not (file_id_flag):
@@ -416,20 +424,20 @@ class UserManagement:
                 print('[ERROR] Invalid file ID format.')
                 continue
             file_id_flag = True
-        data = {'username': username, 'file_id': file_id}
+        payload = {'username': username, 'file_id': file_id}
         try:
-            response = requests.post(f"{SERVER_URL}/delete_file", json=data)
+            response = requests.post(f"{SERVER_URL}/delete_file", json=payload)
+            data = response.json()
             if response.status_code == 200:
-                print(f"[STATUS] File '{file_id}' deleted successfully.")
-            elif response.status_code == 403:
-                error = response.json()["error"]
-                print(f"[ERROR] {error}")
+                print(data["message"])
+            elif response.status_code in [400, 403]:
+                print(data["message"])
                 return False 
             else:
                 print("[ERROR] Server error.")
                 return False       
-        except requests.exceptions.RequestException as e:
-            print(f"[ERROR] Network error: {e}.")
+        except requests.exceptions.RequestException as error:
+            print(f"[ERROR] Network error: {error}.")
             return False
         return True
     @staticmethod
@@ -446,13 +454,14 @@ class UserManagement:
         available_usernames = []
         try:
             response = requests.post(f"{SERVER_URL}/get_users")
+            data = response.json()
             if response.status_code == 200:
-                message = response.json()["message"]
-                available_usernames = message.split(',').sort()
+                usernames = data["usernames"]
+                available_usernames = usernames.split(',').sort()
                 available_usernames.remove(username)
+                print(data["message"])
             elif response.status_code == 403:
-                error = response.json()["error"]
-                print(f"[ERROR] {error}")
+                print(data["message"])
                 return False
             else:
                 print("[ERROR] Server error.")
@@ -470,75 +479,105 @@ class UserManagement:
                     continue
                 file_id_flag = True
             if not selected_usernames_id_flag:
-                if len(available_usernames) < 1:
+                if len(available_usernames) < 1 and len(selected_usernames) < 1:
+                    print("[STATUS] There are no more available usernames to share with.")
                     selected_usernames_id_flag = True
                     continue
-                print("Added users:")
-                for i in range(len(selected_usernames)):
-                    print(f"{i + 1}. {selected_usernames[i]}")
+                print("\nAdded users to share with:")
+                if not selected_usernames:
+                    print("  (None)")
+                else:
+                    for i in range(len(selected_usernames)):
+                        print(f"  {i + 1}. {selected_usernames[i]}")
                 print("Other available users:")
-                for i in range(len(available_usernames)):
-                    print(f"{i + 1}. {available_usernames[i]}")
-                selected_usernames_id = input("Please input the index of the user to share with (or type \"q\" to EXIT, \"b\" to BACK):\n> ")            
-                # use \"-\" with the index (e.g. -1) to remove (to be implemented)
+                if not available_usernames:
+                    print("  (None)")
+                else:
+                    for i in range(len(available_usernames)):
+                        print(f"  {i + 1}. {available_usernames[i]}")
+                selected_usernames_id = input(
+                    "Please input the index of the user to share with (or type \"q\" to EXIT, \"b\" to BACK, \"c\" to CONTINUE, or \"-<index>\" to remove a user, e.g., -1):\n> "
+                ).strip()
                 if selected_usernames_id == "q":
                     return False
                 if selected_usernames_id == "b":
-                    available_usernames.append(selected_usernames)
+                    available_usernames.extend(selected_usernames)
+                    available_usernames.sort()
                     selected_usernames = []
-                    selected_usernames_id_flag = False
                     continue
                 if selected_usernames_id == "c":
-                    selected_usernames_id_flag = True
+                    if not selected_usernames:
+                        print("[ERROR] You must select at least one user to share with.")
+                        continue
+                elif selected_usernames_id.startswith("-"):
+                    if not selected_usernames:
+                        print("[ERROR] No users to remove. Add users first.")
+                        continue
+                    try:
+                        remove_index = int(selected_usernames_id[1:])
+                        if remove_index < 1 or remove_index > len(selected_usernames):
+                            print("[ERROR] Index to remove is out of range.")
+                            continue
+                        removed_user = selected_usernames.pop(remove_index - 1)
+                        available_usernames.append(removed_user)
+                        available_usernames.sort()
+                        print(f"[STATUS] Removed {removed_user} from the share list.")
+                    except ValueError:
+                        print("[ERROR] Invalid removal index. Use format like '-1'.")
                     continue
-                if not selected_usernames_id.isdigit():
-                    print("[ERROR] Input must be a digit.")
+                else:
+                    if not selected_usernames_id.isdigit():
+                        print("[ERROR] Input must be a digit (or a negative index to remove).")
+                        continue
+                    selected_index = int(selected_usernames_id)
+                    if selected_index < 1 or selected_index > len(available_usernames):
+                        print("[ERROR] Index selected is out of range.")
+                        continue
+                    selected_user = available_usernames.pop(selected_index - 1)
+                    selected_usernames.append(selected_user)
+                    print(f"[STATUS] Added {selected_user} to the share list.")
                     continue
-                if int(selected_usernames_id) > len(selected_usernames) or int(selected_usernames_id) < 1:
-                    print("[ERROR] Index selected is out of range.")
-                    continue
-                selected_usernames.append(available_usernames.pop(int(selected_usernames_id) - 1))
-        data = {"username": username, "file_id": file_id, "share_info": {}}
-        try:
-            response = requests.post(f"{SERVER_URL}/share_file", json={'username': username, 'file_id': file_id})
-            response_data = response.json()
-            if response.status_code == 200:
-                shared_file_ids = response_data["shared_file_ids"]
-            elif response.status_code == 403:
-                error = response_data["error"]
-                print(f"[ERROR] {error}")
-                return None
-            else: 
-                print("[ERROR] Server error.")
-                return False 
-            # if response_data['access'] == 'shared':
-            #     print("[ERROR] File shared from others can not be shared again.")      
-            ##############################################################
-            # Server return the encrypted file, and all pk for the users #
-            ##############################################################
-            for user in available_usernames:
-                response = requests.post(f"{SERVER_URL}/get_rsa", json={'username': user})
-                user_rsa = response.json()['rsa']
-                data['share_info'][user] = CryptoManager.encrypt_file_for_sharing(user_rsa, response_data['content'])
-            response = requests.post(f"{SERVER_URL}/share", json=data)
-            #return response.json()
-        except requests.exceptions.RequestException as e:
-            print(f"[ERROR] Network error: {e}.")
-            return False
-        return True
+                selected_usernames_id_flag = True
+        # data = {"username": username, "file_id": file_id, "share_info": {}}
+        # try:
+        #     response = requests.post(f"{SERVER_URL}/share_file", json={'username': username, 'file_id': file_id})
+        #     fetched_file = response.json()
+        #     if response.status_code == 200:
+        #         shared_file_ids = fetched_file["shared_file_ids"]
+        #     elif response.status_code == 403:
+        #         error = fetched_file["error"]
+        #         print(f"[ERROR] {error}")
+        #         return None
+        #     else: 
+        #         print("[ERROR] Server error.")
+        #         return False 
+        #     # if fetched_file['access'] == 'shared':
+        #     #     print("[ERROR] File shared from others can not be shared again.")      
+        #     ##############################################################
+        #     # Server return the encrypted file, and all pk for the users #
+        #     ##############################################################
+        #     for user in available_usernames:
+        #         response = requests.post(f"{SERVER_URL}/get_rsa", json={'username': user})
+        #         user_rsa = response.json()['rsa']
+        #         data['share_info'][user] = CryptoManager.encrypt_file_for_sharing(user_rsa, fetched_file['content'])
+        #     response = requests.post(f"{SERVER_URL}/share", json=data)
+        #     #return response.json()
+        # except requests.exceptions.RequestException as e:
+        #     print(f"[ERROR] Network error: {e}.")
+        #     return False
+        # return True
     @staticmethod
     def download_file_IO(username, password):
         """
         Download an existing file from the server to a specific directory.
         """
-        # Query user for the target file id
         file_id_flag = False
         file_path_flag = False
         secret_key_flag = False
         file_id = None
         file_path = None
         secret_key = None
-        response_data = None
+        fetched_file = None
         while not (file_id_flag and file_path_flag and secret_key_flag):
             if not (file_id_flag):
                 file_id = input("Please input the file ID for the file to be downloaded (or type \"q\" to EXIT):\n> ")
@@ -558,65 +597,65 @@ class UserManagement:
                 if not os.path.isfile(file_path):
                     print("[ERROR] Invalid file path or file does not exist.")
                     continue
-                # Request for the file content from server
-                data = {'username': username, 'file_id': file_id}
+                payload = {'username': username, 'file_id': file_id}
                 try:
-                    response = requests.post(f"{SERVER_URL}/get_file", json=data)
+                    response = requests.post(f"{SERVER_URL}/view_file", json=payload)
+                    fetched_file = response.json()
                     if response.status_code == 200:
-                        response_data = response.json()
                         print(f"[STATUS] File '{file_id}' fetched successfully.")
-                    elif response.status_code == 403:
-                        error = response.json()["error"]
-                        print(f"[ERROR] {error}")
+                    elif response.status_code in [400, 403]:
+                        print(fetched_file["message"])
                         return False
                     else:
                         print("[ERROR] Server error.")
                         return False
-                except requests.exceptions.RequestException as e:
-                    print(f"[ERROR] Network error: {e}.")
+                except requests.exceptions.RequestException as error:
+                    print(f"[ERROR] Network error: {error}.")
                     return None
                 file_path_flag = True
-            if not secret_key_flag:
-                if response_data['access'] == 'shared':
+            if not (secret_key_flag):
+                if fetched_file['access'] == 'shared':
                     secret_key = input("Please enter your secret key to decrypt, as the file is shared (or type \"q\" to EXIT, \"b\" to BACK):\n> ")
                     if secret_key == "q":
                         return False
                     elif secret_key == "b":
-                        secret_key_flag = False
+                        file_path_flag = False
                         continue
-                    CryptoManager.decrypt_shared_file(secret_key, response_data['content'], file_path)
+                    CryptoManager.decrypt_shared_file(secret_key, fetched_file['content'], file_path)
                 else:
-                    response = requests.post(f"{SERVER_URL}/get_aes", json={'username': username})
+                    response = requests.post(f"{SERVER_URL}/get_aes_key", json={'username': username})
+                    data = response.json()
                     if response.status_code == 200:
-                        print(f"[STATUS] AES for '{username}' fetched successfully.")
-                    elif response.status_code == 400:
-                        error = response.json()["error"]
-                        print(f"[ERROR] {error}")
+                        print(data["message"])
+                    elif response.status_code in [400, 401, 403]:
+                        print(data["message"])
                         return False
                     else:
                         print("[ERROR] Server error.")
                         return False
-                    CryptoManager.decrypt_file_with_aes(password, response.json()['aes'], response_data['content'], file_path)
+                    CryptoManager.decrypt_file_with_aes(password, data["aes_key"], fetched_file['content'], file_path)
                 secret_key_flag = True
-        #return response.json()
         return True
     @staticmethod
-    def view_file_IO(username):
+    def check_file_IO(username):
         """
         Fetch all file names in the storages that this client can read.
         """
+        files = None
         try:
             response = requests.post(f"{SERVER_URL}/get_files", json={"username": username})
+            data = response.json()
             if response.status_code == 200:
-                files = response.json()['files']
+                files = data['files']
+                print(data["message"])
                 for i in range(len(files)):
                     print(f"{i + 1}. {files[i]}")
-            elif response.status_code == 403:
-                error = response.json()["error"]
-                print(f"[ERROR] {error}")
+            elif response.status_code == [400, 403]:
+                print(data["message"])
                 return False
             else:
                 print("[ERROR] Server error.")
                 return False
-        except requests.exceptions.RequestException as e:
-            print(f"[ERROR] Network error: {e}.")
+        except requests.exceptions.RequestException as error:
+            print(f"[ERROR] Network error: {error}.")
+        return True

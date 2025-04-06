@@ -91,14 +91,14 @@ class CryptoManager:
         return len(encrypted_aes_key).to_bytes(2, "big") + encrypted_aes_key + iv + ciphertext
     
     @staticmethod
-    def decrypt_shared_file(private_key, encrypted_data, output_file_path):
+    def decrypt_shared_file(secret_key, encrypted_data, output_file_path):
         key_length = int.from_bytes(encrypted_data[:2], "big")
         break_point1 = key_length + 2
         encrypted_aes_key = encrypted_data[2:break_point1]
         break_point2 = break_point1 + 16
         iv = encrypted_data[break_point1:break_point2]
         ciphertext = encrypted_data[break_point2:]
-        rsa_key = RSA.import_key(private_key)
+        rsa_key = RSA.import_key(secret_key)
         rsa_cipher = PKCS1_OAEP.new(rsa_key)
         aes_key = rsa_cipher.decrypt(encrypted_aes_key)
         aes_cipher = AES.new(aes_key, AES.MODE_CBC, iv)

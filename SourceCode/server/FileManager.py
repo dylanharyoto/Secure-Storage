@@ -35,7 +35,7 @@ class FileManager:
         user_aes = self.cursor.fetchone()
         return user_aes
     
-    def get_user_rsa(self, username):
+    def get_rsa_key(self, username):
         """Retrieve aes key for a given username"""
         self.cursor.execute('''SELECT pk FROM users WHERE username = ?''', (username,))
         user_rsa = self.cursor.fetchone()
@@ -109,37 +109,23 @@ class FileManager:
             new_file_ids[shared_user] = new_file_id
         self.conn.commit()
         return new_file_ids
-    
     def view_file(self, username, file_id):
         """
-        Retrieve the file's content and the AES key.
-        - If the requester is the owner, the owner's AES key is retrieved.
-        - If the requester is a shared user, the owner's AES key is retrieved.
+        Retrieve a file's content.
+        Checks that the file's owner matches the username.
+        Returns a tuple (content, access) if access is permitted.
         """
-        # Query the file record.
-        self.cursor.execute("SELECT owner, content FROM files WHERE file_id = ?", (file_id,))
+        self.cursor.execute(
+            "SELECT owner, content, access FROM files WHERE file_id = ?",
+            (file_id,)
+        )
         result = self.cursor.fetchone()
         if not result:
-            raise ValueError("File not found")
-        owner, content = result
-        
-        # Check access permission.
+            raise ValueError("File not found.")
+        owner, content, access = result
         if owner != username:
-            self.cursor.execute(
-                "SELECT 1 FROM shares WHERE file_id = ? AND shared_with = ?",
-                (file_id, username)
-            )
-            if not self.cursor.fetchone():
-                raise PermissionError("You do not have permission to access this file.")
-
-        # Retrieve the AES key from the users table.
-        # For both owner and shared users, the AES key of the file owner is returned.
-        self.user_cursor.execute("SELECT key FROM users WHERE username = ?", (owner,))
-        user_record = self.user_cursor.fetchone()
-        if not user_record:
-            raise ValueError("User record not found for owner")
-        aes_key = user_record[0]
-        return content, aes_key
+            raise PermissionError("You do not have permission to access this file.")
+        return content, access
 
     def get_users(self):
         """Return a list of all usernames from the users table."""

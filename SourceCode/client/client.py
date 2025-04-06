@@ -39,7 +39,7 @@ def run():
 def session(username, password):
     while True:
         print("\nHome Page:")
-        print("1. View File Storage")
+        print("1. Check File(s)")
         print("2. Upload File")
         print("3. Download File")
         print("4. Edit File")
@@ -48,7 +48,7 @@ def session(username, password):
         print("7. Log Out")
         choice = input("Enter your choice:\n> ").strip()
         if choice == "1":
-            UserManagement.view_file_IO(username)
+            UserManagement.check_file_IO(username)
         elif choice == "2":
             UserManagement.upload_file_IO(username, password)
         elif choice == "3":
