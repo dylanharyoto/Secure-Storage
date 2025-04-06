@@ -102,10 +102,10 @@ def upload_file():
     if not (username and file):
         return jsonify({"message": "[ERROR] Missing username or file."}), 400
     try:
-        file_id = FileManager.upload_file(get_db(FILES_DB), username, file.file_name, file.read()) # change file.filename to file.file_name
+        file_id = FileManager.upload_file(get_db(FILES_DB), username, file.filename, file.read())
     except Exception as error:
         return jsonify({"message": f"[ERROR] {str(error)}."}), 403
-    return jsonify({"message": f"[STATUS] File '{username}' uploaded successfully.", "file_id": file_id}), 200
+    return jsonify({"message": f"[STATUS] File '{file.filename}' uploaded successfully.", "file_id": file_id}), 200
 
 # Endpoint: Edit a file (only if owned by the requester)
 @app.route('/edit_file', methods=['POST'])

@@ -29,12 +29,13 @@ class ClientIO:
                     continue
                 try:
                     response = requests.post(f"{SERVER_URL}/check_username", json={"username": username})
-                    data = response.json()
                     if response.status_code == 200:
-                        print(data["message"])
+                        response_data = response.json()
+                        print(response_data["message"])
                         continue
                     elif response.status_code == 201:
-                        print(data["message"])
+                        response_data = response.json()
+                        print(response_data["message"])
                     else:
                         print("[ERROR] Server error.")
                         return False, None, None
@@ -74,11 +75,12 @@ class ClientIO:
                 "encrypted_aes_key": encrypted_aes_key, 
                 "public_key": public_key
                 })
-            data = response.json()
             if response.status_code == 200:
-                print(data["message"])
+                response_data = response.json()
+                print(response_data["message"])
             elif response.status_code == 400:
-                print(data["message"])
+                response_data = response.json()
+                print(response_data["message"])
                 return False, None, None
             else:
                 print("[ERROR] Server error.")
@@ -106,11 +108,12 @@ class ClientIO:
                     response = requests.post(f"{SERVER_URL}/check_username", json={
                         "username": username
                         })
-                    data = response.json()
                     if response.status_code == 200:
-                        print(data["message"])
+                        response_data = response.json()
+                        print(response_data["message"])
                     elif response.status_code == 201:
-                        print(data["message"])
+                        response_data = response.json()
+                        print(response_data["message"])
                         continue
                     else:
                         print("[ERROR] Server error.")
@@ -135,11 +138,12 @@ class ClientIO:
                         "username": username, 
                         "password": hashed_password
                         })
-                    data = response.json()
                     if response.status_code == 200:
-                        print(data["message"])
+                        response_data = response.json()
+                        print(response_data["message"])
                     elif response.status_code == 201:
-                        print(data["message"])
+                        response_data = response.json()
+                        print(response_data["message"])
                         continue
                     else:
                         print("[ERROR] Server error.")
@@ -176,11 +180,12 @@ class ClientIO:
                     response = requests.post(f"{SERVER_URL}/check_username", json={
                         "username": username
                         })
-                    data = response.json()
                     if response.status_code == 200:
-                        print(data["message"])
+                        response_data = response.json()
+                        print(response_data["message"])
                     elif response.status_code == 201:
-                        print(data["message"])
+                        response_data = response.json()
+                        print(response_data["message"])
                         continue
                     else:
                         print("[ERROR] Server error.")
@@ -194,16 +199,18 @@ class ClientIO:
                     response = requests.post(f"{SERVER_URL}/get_aes_key", json={
                         "username": username
                         })
-                    data = response.json()
                     if response.status_code == 200:
-                        aes_key = data["aes_key"]
-                        print(data["message"])
+                        response_data = response.json()
+                        aes_key = response_data["aes_key"]
+                        print(response_data["message"])
                     elif response.status_code == 400:
-                        print(data["message"])
+                        response_data = response.json()
+                        print(response_data["message"])
                         flag_username = False
                         continue
                     elif response.status_code in [401, 403]:
-                        print(data["message"])
+                        response_data = response.json()
+                        print(response_data["message"])
                         return False, None
                     else:
                         print("[ERROR] Server error.")
@@ -251,11 +258,12 @@ class ClientIO:
                 "new_password": hashed_new_password,
                 "new_aes_key": encrypted_aes_key
                 })
-            data = response.json()
             if response.status_code == 200:
-                print(data["message"])
+                response_data = response.json()
+                print(response_data["message"])
             elif response.status_code == 400:
-                print(data["message"])
+                response_data = response.json()
+                print(response_data["message"])
                 return False, None
             else:
                 print("[ERROR] Server error.")
@@ -289,12 +297,13 @@ class ClientIO:
                     response = requests.post(f"{SERVER_URL}/get_aes_key", json={
                         "username": username
                         })
-                    data = response.json()
                     if response.status_code == 200:
-                        aes_key = data["aes_key"]
-                        print(data["message"])
+                        response_data = response.json()
+                        aes_key = response_data["aes_key"]
+                        print(response_data["message"])
                     elif response.status_code in [400, 401, 403]:
-                        print(data["message"])
+                        response_data = response.json()
+                        print(response_data["message"])
                         return False, None
                     else:
                         print("[ERROR] Server error.")
@@ -304,8 +313,8 @@ class ClientIO:
                     return False, None
                 aes_key_flag = True
         # Process original file and make a temp new file, store the path of new into encrypted_file_path
-        encrypted_file_data = CryptoManager.encrypt_file_with_aes(password, aes_key, encrypted_file_path)
-        files = {'file': encrypted_file_data}
+        encrypted_file_data = CryptoManager.encrypt_file_with_aes(password, aes_key, file_path) # this function expects the 'file_path', not the encrypted one
+        files = {'file': encrypted_file_data} # files = {'file': (os.path.basename(file_path), encrypted_file_data)}
         try:
             response = requests.post(f"{SERVER_URL}/upload_file", 
                                      files=files, 
@@ -341,12 +350,13 @@ class ClientIO:
                     response = requests.post(f"{SERVER_URL}/get_files", json={
                         "username": username
                         })
-                    data = response.json()
                     if response.status_code == 200:
-                        files = data["files"]
-                        print(data["message"])
+                        response_data = response.json()
+                        files = response_data["files"]
+                        print(response_data["message"])
                     elif response.status_code in [400, 403]:
-                        print(data["message"])
+                        response_data = response.json()
+                        print(response_data["message"])
                         return False
                     else:
                         print("[ERROR] Server error.")
@@ -380,12 +390,13 @@ class ClientIO:
         encrypted_file_path = os.path.join("temp", os.path.basename(file_path)) # os.path.basename(file_path) = file_name
         try:
             response = requests.post(f"{SERVER_URL}/get_aes_key", json={'username': username})
-            data = response.json()
             if response.status_code == 200:
-                aes_key = data["aes_key"]
-                print(data["message"])
+                response_data = response.json()
+                aes_key = response_data["aes_key"]
+                print(response_data["message"])
             elif response.status_code == [400, 401, 403]:
-                print(data["message"])
+                response_data = response.json()
+                print(response_data["message"])
                 return False
             else:
                 print("[ERROR] Server error.")
@@ -394,16 +405,17 @@ class ClientIO:
             print(f"[ERROR] Network error: {error}.")
             return False        
         # Process original file and make a temp new file, store the path of new into encrypted_file_path
-        new_content = CryptoManager.encrypt_file_with_aes(password, aes_key, encrypted_file_path)
+        new_content = CryptoManager.encrypt_file_with_aes(password, aes_key, file_path)
         payload = {'username': username, 'file_id': file_id, 'content': new_content}
         try:
             response = requests.post(f"{SERVER_URL}/edit_file", json=payload)
-            data = response.json()
             if response.status_code == 200:
+                response_data = response.json()
                 os.remove(encrypted_file_path)
-                print(data["message"])
+                print(response_data["message"])
             elif response.status_code in [400, 403]:
-                print(data["message"])
+                response_data = response.json()
+                print(response_data["message"])
                 return False
             else:
                 print("[ERROR] Server error.")
@@ -427,11 +439,12 @@ class ClientIO:
         payload = {'username': username, 'file_id': file_id}
         try:
             response = requests.post(f"{SERVER_URL}/delete_file", json=payload)
-            data = response.json()
             if response.status_code == 200:
-                print(data["message"])
+                response_data = response.json()
+                print(response_data["message"])
             elif response.status_code in [400, 403]:
-                print(data["message"])
+                response_data = response.json()
+                print(response_data["message"])
                 return False 
             else:
                 print("[ERROR] Server error.")
@@ -454,14 +467,15 @@ class ClientIO:
         available_usernames = []
         try:
             response = requests.post(f"{SERVER_URL}/get_users")
-            data = response.json()
             if response.status_code == 200:
-                usernames = data["usernames"]
+                response_data = response.json()
+                usernames = response_data["usernames"]
                 available_usernames = usernames.split(',').sort()
                 available_usernames.remove(username)
-                print(data["message"])
+                print(response_data["message"])
             elif response.status_code == 403:
-                print(data["message"])
+                response_data = response.json()
+                print(response_data["message"])
                 return False
             else:
                 print("[ERROR] Server error.")
@@ -600,11 +614,12 @@ class ClientIO:
                 payload = {'username': username, 'file_id': file_id}
                 try:
                     response = requests.post(f"{SERVER_URL}/view_file", json=payload)
-                    fetched_file = response.json()
                     if response.status_code == 200:
+                        fetched_file = response.json()
                         print(f"[STATUS] File '{file_id}' fetched successfully.")
                     elif response.status_code in [400, 403]:
-                        print(fetched_file["message"])
+                        response_data = response.json()
+                        print(response_data["message"])
                         return False
                     else:
                         print("[ERROR] Server error.")
@@ -624,11 +639,12 @@ class ClientIO:
                     CryptoManager.decrypt_shared_file(secret_key, fetched_file['content'], file_path)
                 else:
                     response = requests.post(f"{SERVER_URL}/get_aes_key", json={'username': username})
-                    data = response.json()
                     if response.status_code == 200:
-                        print(data["message"])
+                        response_data = response.json()
+                        print(response_data["message"])
                     elif response.status_code in [400, 401, 403]:
-                        print(data["message"])
+                        response_data = response.json()
+                        print(response_data["message"])
                         return False
                     else:
                         print("[ERROR] Server error.")
@@ -644,14 +660,15 @@ class ClientIO:
         files = None
         try:
             response = requests.post(f"{SERVER_URL}/get_files", json={"username": username})
-            data = response.json()
             if response.status_code == 200:
-                files = data['files']
-                print(data["message"])
+                fetched_files = response.json()
+                files = fetched_files['files']
+                print(fetched_files["message"])
                 for i in range(len(files)):
                     print(f"{i + 1}. {files[i]}")
             elif response.status_code == [400, 403]:
-                print(data["message"])
+                response_data = response.json()
+                print(response_data["message"])
                 return False
             else:
                 print("[ERROR] Server error.")
