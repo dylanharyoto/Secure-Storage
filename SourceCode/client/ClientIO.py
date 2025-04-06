@@ -3,8 +3,8 @@ import os
 from SourceCode.Shared.Utils import Utils
 from SourceCode.Client.CryptoManager import CryptoManager
 
-
-SERVER_URL = os.getenv("SERVER_URL", "http://localhost:5100")
+SERVER_PORT = 5100
+SERVER_URL = os.getenv("SERVER_URL", f"http://localhost:{SERVER_PORT}")
 class ClientIO:
     @staticmethod
     def register_user_IO():
@@ -279,7 +279,6 @@ class ClientIO:
         file_path = None
         aes_key = None
         file_id = None
-        encrypted_file_path = None
         encrypted_file_data = None
         files = None
         while not (file_path_flag and aes_key_flag):
@@ -290,7 +289,6 @@ class ClientIO:
                 if not os.path.isfile(file_path):
                     print("[ERROR] Invalid file path or file does not exist.")
                     continue
-                encrypted_file_path = os.path.join("temp", os.path.basename(file_path)) # os.path.basename(file_path) = file_name
                 file_path_flag = True
             if not aes_key_flag:
                 try:
@@ -312,8 +310,7 @@ class ClientIO:
                     print(f"[ERROR] Network error: {error}.")
                     return False, None
                 aes_key_flag = True
-        # Process original file and make a temp new file, store the path of new into encrypted_file_path
-        encrypted_file_data = CryptoManager.encrypt_file_with_aes(password, aes_key, file_path) # this function expects the 'file_path', not the encrypted one
+        encrypted_file_data = CryptoManager.encrypt_file_with_aes(password, aes_key, file_path) 
         files = {'file': encrypted_file_data} # files = {'file': (os.path.basename(file_path), encrypted_file_data)}
         try:
             response = requests.post(f"{SERVER_URL}/upload_file", 
@@ -322,7 +319,6 @@ class ClientIO:
             data = response.json
             if response.status_code == 200:
                 file_id = data["file_id"]
-                os.remove(encrypted_file_path)
                 print(data["message"])
             elif response.status_code in [400, 403]:
                 print(data["message"])
@@ -343,7 +339,6 @@ class ClientIO:
         file_id = None
         file_path = None
         aes_key = None
-        encrypted_file_path = None
         while not (files_flag and file_path_flag and file_id_flag):
             if not files_flag:
                 try:
@@ -409,7 +404,6 @@ class ClientIO:
                     print("[ERROR] Invalid file path or file does not exist.")
                     continue
                 file_path_flag = True
-        encrypted_file_path = os.path.join("temp", os.path.basename(file_path)) # os.path.basename(file_path) = file_name
         try:
             response = requests.post(f"{SERVER_URL}/get_aes_key", json={'username': username})
             if response.status_code == 200:
@@ -426,14 +420,12 @@ class ClientIO:
         except requests.exceptions.RequestException as error:
             print(f"[ERROR] Network error: {error}.")
             return False        
-        # Process original file and make a temp new file, store the path of new into encrypted_file_path
         new_content = CryptoManager.encrypt_file_with_aes(password, aes_key, file_path)
         payload = {'username': username, 'file_id': file_id, 'content': new_content}
         try:
             response = requests.post(f"{SERVER_URL}/edit_file", json=payload)
             if response.status_code == 200:
                 response_data = response.json()
-                os.remove(encrypted_file_path)
                 print(response_data["message"])
             elif response.status_code in [400, 403]:
                 response_data = response.json()
