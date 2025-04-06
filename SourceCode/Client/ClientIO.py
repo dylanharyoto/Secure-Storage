@@ -501,6 +501,7 @@ class ClientIO:
         selected_usernames_id = None
         selected_usernames = []
         available_usernames = []
+        fetched_file = None
         try:
             response = requests.post(f"{SERVER_URL}/get_users")
             if response.status_code == 200:
@@ -616,7 +617,7 @@ class ClientIO:
             response = requests.post(f"{SERVER_URL}/view_file", json=fetch_payload)
             if response.status_code == 200:
                 fetched_file = response.json()
-                print(f"[STATUS] File '{file_id}' fetched successfully.")
+                print(fetched_file["message"])
             elif response.status_code in [400, 403]:
                 response_data = response.json()
                 print(response_data["message"])
@@ -636,16 +637,17 @@ class ClientIO:
         share_data = {"username": username, "file_id": file_id, "share_info": {}}
 
         # Server return the encrypted file, and all pk for the selected users to share 
-        for user in selected_usernames: 
-            response = requests.post(f"{SERVER_URL}/get_rsa", json={'username': user})
-            user_rsa = response.json()['rsa']
-            share_data['share_info'][user] = CryptoManager.encrypt_file_for_sharing(user_rsa, fetched_file['content'])
+        for username in selected_usernames: 
+            response = requests.post(f"{SERVER_URL}/get_rsa_key", json={'username': username}) # Need try... except... here, will add tmr
+            response_data = response.json()
+            user_rsa = response_data["rsa_key"]
+            share_data['share_info'][username] = CryptoManager.encrypt_file_for_sharing(user_rsa, fetched_file['content'])
         try:
-            response = requests.post(f"{SERVER_URL}/share", json=share_data)
-            return True
-        except requests.exceptions.RequestException as e:
-            print(f"[ERROR] Network error: {e}.")
+            response = requests.post(f"{SERVER_URL}/share_file", json=share_data)
+        except requests.exceptions.RequestException as error:
+            print(f"[ERROR] Network error: {error}.")
             return False
+        return True
 
     @staticmethod
     def download_file_IO(username, password):
