@@ -78,7 +78,6 @@ class RequestManager:
             except ValueError:
                 message = response.text
                 response_data = {}
-
             if status_code in retry_codes:
                 print(message)
                 return True, False, None

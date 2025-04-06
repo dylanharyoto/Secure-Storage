@@ -2,6 +2,7 @@ import requests
 import os
 from SourceCode.Shared.Utils import Utils
 from SourceCode.Client.CryptoManager import CryptoManager
+from SourceCode.Client.RequestManager import RequestManager
 
 SERVER_PORT = 5100
 SERVER_URL = os.getenv("SERVER_URL", f"http://localhost:{SERVER_PORT}")
@@ -27,21 +28,17 @@ class ClientIO:
                 if not Utils.check_username_regex(username):
                     print('[ERROR] Invalid email format.')
                     continue
-                try:
-                    response = requests.post(f"{SERVER_URL}/check_username", json={"username": username})
-                    if response.status_code == 200:
-                        response_data = response.json()
-                        print(response_data["message"])
-                        continue
-                    elif response.status_code == 201:
-                        response_data = response.json()
-                        print(response_data["message"])
-                    else:
-                        print("[ERROR] Server error.")
-                        return False, None, None
-                except requests.exceptions.RequestException as error:
-                    print(f"[ERROR] Network error: {error}.")
+                # ==== New feature, wrap post_request into a static function
+                flag_continue, flag_success, _ = RequestManager.post_request(
+                    endpoint="check_username",
+                    success_codes=[201],
+                    retry_codes=[200]
+                )
+                if flag_continue: 
                     continue
+                elif not flag_success:
+                    return False, None, None                
+                # ==== New feature, wrap post_request into a static function
                 flag_username = True
             if not flag_password1:
                 password1 = input('Enter a password with at least 8 characters (or type "q" to EXIT, "b" to BACK):\n> ').strip()
@@ -68,26 +65,20 @@ class ClientIO:
         encrypted_aes_key, recovery_key = CryptoManager.encrypt_with_aes(password1)
         secret_key, public_key = CryptoManager.generate_rsa_key_pair()
         hashed_password = CryptoManager.hash_password(password1)
-        try:
-            response = requests.post(f"{SERVER_URL}/register_user", json={
+        # ==== New feature, wrap post_request into a static function
+        flag_continue, flag_success, _ = RequestManager.post_request(
+            endpoint="register_user",
+            data={
                 "username": username, 
                 "password": hashed_password, 
                 "encrypted_aes_key": encrypted_aes_key, 
                 "public_key": public_key
-                })
-            if response.status_code == 200:
-                response_data = response.json()
-                print(response_data["message"])
-            elif response.status_code == 400:
-                response_data = response.json()
-                print(response_data["message"])
-                return False, None, None
-            else:
-                print("[ERROR] Server error.")
-                return False, None, None
-        except requests.exceptions.RequestException as error:
-            print(f"[ERROR] Network error: {error}.")
+            },
+            success_codes=[200]
+        )
+        if flag_continue or not flag_success:
             return False, None, None
+        # ==== New feature, wrap post_request into a static function
         return True, recovery_key, secret_key
     @staticmethod
     def login_user_IO():
@@ -104,23 +95,18 @@ class ClientIO:
                 if not Utils.check_username_regex(username):
                     print('[ERROR] Invalid email format.')
                     continue
-                try:
-                    response = requests.post(f"{SERVER_URL}/check_username", json={
-                        "username": username
-                        })
-                    if response.status_code == 200:
-                        response_data = response.json()
-                        print(response_data["message"])
-                    elif response.status_code == 201:
-                        response_data = response.json()
-                        print(response_data["message"])
-                        continue
-                    else:
-                        print("[ERROR] Server error.")
-                        return False, None, None
-                except requests.exceptions.RequestException as error:
-                    print(f"[ERROR] Network error: {error}.")
+                # ==== New feature, wrap post_request into a static function
+                flag_continue, flag_success, _ = RequestManager.post_request(
+                    endpoint="check_username",
+                    data={"username": username},
+                    success_codes=[200],
+                    retry_codes=[201]
+                )
+                if flag_continue:
+                    continue
+                elif not flag_success:
                     return False, None, None
+                # ==== New feature, wrap post_request into a static function
                 flag_username = True
             if not flag_password:
                 password = input('Enter your password (or type "q" to EXIT, "b" to BACK):\n> ').strip()
@@ -133,24 +119,18 @@ class ClientIO:
                     print("[ERROR] Password must be at least 8 characters long.")
                     continue
                 hashed_password = CryptoManager.hash_password(password)
-                try:
-                    response = requests.post(f"{SERVER_URL}/login_user", json={
-                        "username": username, 
-                        "password": hashed_password
-                        })
-                    if response.status_code == 200:
-                        response_data = response.json()
-                        print(response_data["message"])
-                    elif response.status_code == 201:
-                        response_data = response.json()
-                        print(response_data["message"])
-                        continue
-                    else:
-                        print("[ERROR] Server error.")
-                        return False, None, None
-                except requests.exceptions.RequestException as error:
-                    print(f"[ERROR] Network error: {error}.")
+                # ==== New feature, wrap post_request into a static function
+                flag_continue, flag_success, _ = RequestManager.post_request(
+                    endpoint="login_user",
+                    data={"username": username, "password": hashed_password},
+                    success_codes=[200],
+                    retry_codes=[201]
+                )
+                if flag_continue:
+                    continue
+                elif not flag_success:
                     return False, None, None
+                # ==== New feature, wrap post_request into a static function
                 flag_password = True
         return True, username, password
     @staticmethod
@@ -176,48 +156,34 @@ class ClientIO:
                 if not Utils.check_username_regex(username):
                     print('[ERROR] Invalid email format.')
                     continue
-                try:
-                    response = requests.post(f"{SERVER_URL}/check_username", json={
-                        "username": username
-                        })
-                    if response.status_code == 200:
-                        response_data = response.json()
-                        print(response_data["message"])
-                    elif response.status_code == 201:
-                        response_data = response.json()
-                        print(response_data["message"])
-                        continue
-                    else:
-                        print("[ERROR] Server error.")
-                        return False, None
-                except requests.exceptions.RequestException as error:
-                    print(f"[ERROR] Network error: {error}")
+                # ==== New feature, wrap post_request into a static function
+                flag_continue, flag_success, _ = RequestManager.post_request(
+                    endpoint="check_username",
+                    data={"username": username},
+                    success_codes=[200],
+                    retry_codes=[201]
+                )
+                if flag_continue:
+                    continue
+                elif not flag_success:
                     return False, None
+                # ==== New feature, wrap post_request into a static function
                 flag_username = True
             if not flag_aes_key:
-                try:
-                    response = requests.post(f"{SERVER_URL}/get_aes_key", json={
-                        "username": username
-                        })
-                    if response.status_code == 200:
-                        response_data = response.json()
-                        aes_key = response_data["aes_key"]
-                        print(response_data["message"])
-                    elif response.status_code == 400:
-                        response_data = response.json()
-                        print(response_data["message"])
-                        flag_username = False
-                        continue
-                    elif response.status_code in [401, 403]:
-                        response_data = response.json()
-                        print(response_data["message"])
-                        return False, None
-                    else:
-                        print("[ERROR] Server error.")
-                        return False, None
-                except requests.exceptions.RequestException as error:
-                    print(f"[ERROR] Network error: {error}")     
+                # ==== New feature, wrap post_request into a static function
+                flag_continue, flag_success, data = RequestManager.post_request(
+                    endpoint="get_aes_key",
+                    data={"username": username},
+                    success_codes=[200],
+                    retry_codes=[400],
+                    return_data_keys=["aes_key"]
+                )
+                if flag_continue:
+                    continue
+                elif not flag_success:
                     return False, None
+                aes_key = data["aes_key"]
+                # ==== New feature, wrap post_request into a static function
                 flag_aes_key = True
             if not flag_recovery_key:
                 recovery_key = input('Enter your recovery key (or type "q" to EXIT, "b" to BACK):\n> ').strip()
@@ -252,24 +218,16 @@ class ClientIO:
                 flag_new_password2 = True
         encrypted_aes_key, recovery_key = CryptoManager.encrypt_with_aes(new_password1)
         hashed_new_password = CryptoManager.hash_password(new_password1)
-        try:
-            response = requests.post(f"{SERVER_URL}/reset_password", json={
+        flag_continue, flag_success, _ = RequestManager.post_request(
+            endpoint="reset_password",
+            data={
                 "username": username, 
                 "new_password": hashed_new_password,
                 "new_aes_key": encrypted_aes_key
-                })
-            if response.status_code == 200:
-                response_data = response.json()
-                print(response_data["message"])
-            elif response.status_code == 400:
-                response_data = response.json()
-                print(response_data["message"])
-                return False, None
-            else:
-                print("[ERROR] Server error.")
-                return False, None
-        except requests.exceptions.RequestException as error:
-            print(f"[ERROR] Network error: {error}.")
+            },
+            success_codes=[200]
+        )
+        if flag_continue or not flag_success:
             return False, None
         return True, recovery_key
     @staticmethod
