@@ -94,6 +94,22 @@ def reset_password():
         return jsonify({"message": f"[STATUS] Password for '{username}' reset successfully."}), 200
     return jsonify({"message": f"[ERROR] Password for '{username}' failed to be reset."}), 400
 
+
+@app.route('/check_file_id', methods=['POST'])
+def check_file_id():
+    data = request.json
+    username = data.get('username')
+    file_id = data.get('file_id')
+    if not (username and file_id):
+        return jsonify({"message": "[ERROR] Missing username or file."}), 400
+    try:
+        result = FileManager.check_file_id(get_db(USERS_DB), username, file_id)
+    except Exception as error:
+        return jsonify({"message": f"[ERROR] {str(error)}."}), 403
+    if not result:
+        return jsonify({"message": "[STATUS] File ID does not exist."}), 201
+    return jsonify({"message": "[STATUS] File ID exists."}), 200
+
 # Endpoint: Upload a file
 @app.route('/upload_file', methods=['POST'])
 def upload_file():

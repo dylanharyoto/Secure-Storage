@@ -15,7 +15,17 @@ class FileManager:
             users_db = os.path.join(os.path.dirname(__file__), "data", "users.db")
         self.user_conn = sqlite3.connect(users_db, check_same_thread=False)
         self.user_cursor = self.user_conn.cursor()
-    
+
+    @staticmethod
+    def check_file_id(db_conn, username, file_id):
+        cursor = db_conn.cursor()
+        cursor.execute(
+            "SELECT file_id FROM files WHERE file_id = ? AND owner = ?",
+            (file_id, username)
+        )
+        result = cursor.fetchone()
+        return result is not None
+
     @staticmethod
     def upload_file(db_conn, username, file_name, content):
         """

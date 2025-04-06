@@ -375,6 +375,28 @@ class ClientIO:
                 if not Utils.check_file_id_regex(file_id):
                     print('[ERROR] Invalid file ID format.')
                     continue
+                try:
+                    response = requests.post(f"{SERVER_URL}/check_file_id", json={
+                        "username": username, 
+                        "file_id": file_id
+                        })
+                    if response.status_code == 200:
+                        response_data = response.json()
+                        print(response_data["message"])
+                    elif response.status_code == 201:
+                        response_data = response.json()
+                        print(response_data["message"])
+                        continue
+                    elif response.status_code in [400, 401]:
+                        response_data = response.json()
+                        print(response_data["message"])
+                        return False
+                    else:
+                        print("[ERROR] Server error.")
+                        return False
+                except requests.exceptions.RequestException as error:
+                    print(f"[ERROR] Network error: {error}.")
+                    return False     
                 file_id_flag = True
             if not file_path_flag:
                 file_path = input("Please input the path of the file to be edited (or type \"q\" to EXIT, \"b\" to BACK):\n> ")
@@ -435,6 +457,28 @@ class ClientIO:
             if not Utils.check_file_id_regex(file_id):
                 print('[ERROR] Invalid file ID format.')
                 continue
+            try:
+                response = requests.post(f"{SERVER_URL}/check_file_id", json={
+                    "username": username, 
+                    "file_id": file_id
+                    })
+                if response.status_code == 200:
+                    response_data = response.json()
+                    print(response_data["message"])
+                elif response.status_code == 201:
+                    response_data = response.json()
+                    print(response_data["message"])
+                    continue
+                elif response.status_code in [400, 401]:
+                    response_data = response.json()
+                    print(response_data["message"])
+                    return False
+                else:
+                    print("[ERROR] Server error.")
+                    return False
+            except requests.exceptions.RequestException as error:
+                print(f"[ERROR] Network error: {error}.")
+                return False
             file_id_flag = True
         payload = {'username': username, 'file_id': file_id}
         try:
@@ -491,6 +535,28 @@ class ClientIO:
                 if not Utils.check_file_id_regex(file_id):
                     print('[ERROR] Invalid file ID format.')
                     continue
+                try:
+                    response = requests.post(f"{SERVER_URL}/check_file_id", json={
+                        "username": username, 
+                        "file_id": file_id
+                        })
+                    if response.status_code == 200:
+                        response_data = response.json()
+                        print(response_data["message"])
+                    elif response.status_code == 201:
+                        response_data = response.json()
+                        print(response_data["message"])
+                        continue
+                    elif response.status_code in [400, 401]:
+                        response_data = response.json()
+                        print(response_data["message"])
+                        return False
+                    else:
+                        print("[ERROR] Server error.")
+                        return False
+                except requests.exceptions.RequestException as error:
+                    print(f"[ERROR] Network error: {error}.")
+                    return False
                 file_id_flag = True
             if not selected_usernames_id_flag:
                 if len(available_usernames) < 1 and len(selected_usernames) < 1:
@@ -600,6 +666,28 @@ class ClientIO:
                 if not Utils.check_file_id_regex(file_id):
                     print('[ERROR] Invalid file ID format.')
                     continue
+                try:
+                    response = requests.post(f"{SERVER_URL}/check_file_id", json={
+                        "username": username, 
+                        "file_id": file_id
+                        })
+                    if response.status_code == 200:
+                        response_data = response.json()
+                        print(response_data["message"])
+                    elif response.status_code == 201:
+                        response_data = response.json()
+                        print(response_data["message"])
+                        continue
+                    elif response.status_code in [400, 401]:
+                        response_data = response.json()
+                        print(response_data["message"])
+                        return False
+                    else:
+                        print("[ERROR] Server error.")
+                        return False
+                except requests.exceptions.RequestException as error:
+                    print(f"[ERROR] Network error: {error}.")
+                    return False
                 file_id_flag = True
             if not (file_path_flag):
                 file_path = input("Please input the path of the file to be edited (or type \"q\" to EXIT, \"b\" to BACK):\n> ")
