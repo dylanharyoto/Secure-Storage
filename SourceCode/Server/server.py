@@ -64,7 +64,6 @@ def check_username():
 
 @app.route('/register_user', methods=['POST'])
 def register_user():
-
     username = request.form.get('username')
     password = request.form.get('password')
     public_key = request.form.get('public_key')
@@ -72,7 +71,6 @@ def register_user():
     if UserManager.register_user(get_db(USERS_DB), username, password, encrypted_aes_key, public_key):
         return jsonify({"message": f"[STATUS] Email '{username}' registered successfully."}), 200
     return jsonify({"message": f"[ERROR] Email '{username}' failed to be registered."}), 400
-    
 
 @app.route('/login_user', methods=['POST'])
 def login_user():
@@ -86,15 +84,13 @@ def login_user():
 
 @app.route('/reset_password', methods=['POST'])
 def reset_password():
-    data = request.json
-    username = data.get('username')
-    new_password = data.get('new_password')
-    new_aes_key = data.get('new_aes_key')
+    username = request.form.get('username')
+    new_password = request.form.get('new_password')
+    new_aes_key = request.files.get('new_aes_key').read()
     #new_hashed_password = Utils.hash_password(new_password)
     if UserManager.reset_password(get_db(USERS_DB), username, new_password, new_aes_key):
         return jsonify({"message": f"[STATUS] Password for '{username}' reset successfully."}), 200
     return jsonify({"message": f"[ERROR] Password for '{username}' failed to be reset."}), 400
-
 
 @app.route('/check_file_id', methods=['POST'])
 def check_file_id():

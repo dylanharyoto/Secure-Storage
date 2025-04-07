@@ -219,6 +219,7 @@ class ClientIO:
                 flag_aes_key = True
             if not flag_recovery_key:
                 recovery_key = input('Enter your recovery key (or type "q" to EXIT, "b" to BACK):\n> ').strip()
+                print(recovery_key)
                 if recovery_key == "q":
                     return False, None
                 if recovery_key == "b":
@@ -249,13 +250,12 @@ class ClientIO:
                     continue
                 flag_new_password2 = True
         encrypted_aes_key, recovery_key = CryptoManager.encrypt_with_aes(new_password1)
-        hashed_new_password = CryptoManager.hash_password(new_password1)
+        hashed_new_password = CryptoManager.hash_password(new_password1) 
         try:
-            response = requests.post(f"{SERVER_URL}/reset_password", json={
+            response = requests.post(f"{SERVER_URL}/reset_password", data={
                 "username": username, 
                 "new_password": hashed_new_password,
-                "new_aes_key": encrypted_aes_key
-                })
+                }, files={"new_aes_key": encrypted_aes_key})
             if response.status_code == 200:
                 response_data = response.json()
                 print(response_data["message"])
@@ -294,9 +294,7 @@ class ClientIO:
                         "username": username
                         })
                     if response.status_code == 200:
-                        response_data = response.json()
-                        aes_key = response_data["aes_key"]
-                        print(response_data["message"])
+                        aes_key = response.content
                     elif response.status_code in [400, 401, 403]:
                         response_data = response.json()
                         print(response_data["message"])
