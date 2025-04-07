@@ -614,34 +614,44 @@ class ClientIO:
                     print(f"[STATUS] Added {selected_user} to the share list.")
                     continue
                 selected_usernames_id_flag = True
-        # data = {"username": username, "file_id": file_id, "share_info": {}}
-        # try:
-        #     response = requests.post(f"{SERVER_URL}/share_file", json={'username': username, 'file_id': file_id})
-        #     fetched_file = response.json()
-        #     if response.status_code == 200:
-        #         shared_file_ids = fetched_file["shared_file_ids"]
-        #     elif response.status_code == 403:
-        #         error = fetched_file["error"]
-        #         print(f"[ERROR] {error}")
-        #         return None
-        #     else: 
-        #         print("[ERROR] Server error.")
-        #         return False 
-        #     # if fetched_file['access'] == 'shared':
-        #     #     print("[ERROR] File shared from others can not be shared again.")      
-        #     ##############################################################
-        #     # Server return the encrypted file, and all pk for the users #
-        #     ##############################################################
-        #     for user in available_usernames:
-        #         response = requests.post(f"{SERVER_URL}/get_rsa", json={'username': user})
-        #         user_rsa = response.json()['rsa']
-        #         data['share_info'][user] = CryptoManager.encrypt_file_for_sharing(user_rsa, fetched_file['content'])
-        #     response = requests.post(f"{SERVER_URL}/share", json=data)
-        #     #return response.json()
-        # except requests.exceptions.RequestException as e:
-        #     print(f"[ERROR] Network error: {e}.")
-        #     return False
-        # return True
+        
+        fetch_payload = {'username': username, 'file_id': file_id}
+        try:
+            response = requests.post(f"{SERVER_URL}/view_file", json=fetch_payload)
+            if response.status_code == 200:
+                fetched_file = response.json()
+                print(fetched_file["message"])
+            elif response.status_code in [400, 403]:
+                response_data = response.json()
+                print(response_data["message"])
+                return False
+            else:
+                print("[ERROR] Server error.")
+                return False
+        except requests.exceptions.RequestException as error:
+            print(f"[ERROR] Network error: {error}.")
+            return None
+        
+        # The file is only allowed to be shared by the owner. The shared user cannot share it for the second time.
+        if fetched_file['access'] == 'shared':
+            print("[ERROR] File shared from others can not be shared again.")  
+            return False    
+        
+        share_data = {"username": username, "file_id": file_id, "share_info": {}}
+
+        # Server return the encrypted file, and all pk for the selected users to share 
+        for username in selected_usernames: 
+            response = requests.post(f"{SERVER_URL}/get_rsa_key", json={'username': username}) # Need try... except... here, will add tmr
+            response_data = response.json()
+            user_rsa = response_data["rsa_key"]
+            share_data['share_info'][username] = CryptoManager.encrypt_file_for_sharing(user_rsa, fetched_file['content'])
+        try:
+            response = requests.post(f"{SERVER_URL}/share_file", json=share_data)
+        except requests.exceptions.RequestException as error:
+            print(f"[ERROR] Network error: {error}.")
+            return False
+        return True
+    
     @staticmethod
     def download_file_IO(username, password):
         """
