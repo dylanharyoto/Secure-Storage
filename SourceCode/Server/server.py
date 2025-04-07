@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, g
+from flask import Response, Flask, request, jsonify, g
 import sqlite3
 import os
 import sys
@@ -64,7 +64,6 @@ def check_username():
 
 @app.route('/register_user', methods=['POST'])
 def register_user():
-
     username = request.form.get('username')
     password = request.form.get('password')
     public_key = request.form.get('public_key')
@@ -72,30 +71,25 @@ def register_user():
     if UserManager.register_user(get_db(USERS_DB), username, password, encrypted_aes_key, public_key):
         return jsonify({"message": f"[STATUS] Email '{username}' registered successfully."}), 200
     return jsonify({"message": f"[ERROR] Email '{username}' failed to be registered."}), 400
-    
 
 @app.route('/login_user', methods=['POST'])
 def login_user():
     # Here, the login_user API is just to retrieved the stored hashA in server users database
     data = request.json
     username = data.get('username')
-    password = data.get('password')
-    hashed_password = UserManager.login_user(get_db(USERS_DB), username, password)
-    if UserManager.login_user(get_db(USERS_DB), username, password):
+    hashed_password = UserManager.login_user(get_db(USERS_DB), username)
+    if hashed_password:
         return jsonify({"message":"", "hashed_password": hashed_password}), 200
     return jsonify({"message": f"[ERROR] {username} has not registered yet."}), 201
 
 @app.route('/reset_password', methods=['POST'])
 def reset_password():
-    data = request.json
-    username = data.get('username')
-    new_password = data.get('new_password')
-    new_aes_key = data.get('new_aes_key')
-    #new_hashed_password = Utils.hash_password(new_password)
+    username = request.form.get('username')
+    new_password = request.form.get('new_password')
+    new_aes_key = request.files.get('new_aes_key').read()
     if UserManager.reset_password(get_db(USERS_DB), username, new_password, new_aes_key):
         return jsonify({"message": f"[STATUS] Password for '{username}' reset successfully."}), 200
     return jsonify({"message": f"[ERROR] Password for '{username}' failed to be reset."}), 400
-
 
 @app.route('/check_file_id', methods=['POST'])
 def check_file_id():
@@ -227,7 +221,8 @@ def get_aes_key():
         return jsonify({"message": f"[ERROR] {str(error)}."}), 403
     if not aes_key:
         return jsonify({"message": f"[ERROR] AES key for {username} is not found."}), 401
-    return jsonify({"message": f"[STATUS] AES key for {username} exists.", "aes_key": aes_key}), 200
+    return Response(aes_key, mimetype='application/octet-stream'), 200
+    #return jsonify({"message": f"[STATUS] AES key for {username} exists.", "aes_key": aes_key}), 200
 
 # Endpoint: Get RSA key
 @app.route('/get_rsa_key', methods=['POST'])
@@ -241,7 +236,8 @@ def get_rsa_key():
         return jsonify({"message": f"[ERROR] {str(error)}."}), 403
     if not rsa_key:
         return jsonify({"message": f"[ERROR] RSA key for {username} is not found."}), 401
-    return jsonify({"message": f"[STATUS] RSA key for {username} exists.", "rsa_key": rsa_key}), 200
+    return Response(rsa_key, mimetype='application/octet-stream'), 200
+    #return jsonify({"message": f"[STATUS] RSA key for {username} exists.", "rsa_key": rsa_key}), 200
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5100, debug=True)

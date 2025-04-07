@@ -94,7 +94,6 @@ class ClientIO:
         flag_password = False
         username = None
         password = None
-        hashed_password = None
         while not (flag_username and flag_password):
             if not flag_username:
                 username = input('Enter your email address (or type "q" to EXIT):\n> ').strip()
@@ -131,20 +130,17 @@ class ClientIO:
                 if not Utils.check_password_regex(password):
                     print("[ERROR] Password must be at least 8 characters long.")
                     continue
-                hashed_password = CryptoManager.hash_password(password)
                 try:
                     # Here, the login_user API is just to retrieved the stored hashA in server users database
                     response = requests.post(f"{SERVER_URL}/login_user", json={
-                        "username": username, 
-                        "password": hashed_password
+                        "username": username
                         })
                     if response.status_code == 200:
                         response_data = response.json()
-                        auth_result = CryptoManager.check_password(password, response_data["hashed_password"])
-                        if auth_result:
-                            print (f"[STATUS] Email '{username}' log in successfully.")
-                        else:
+                        if not CryptoManager.check_password(password, response_data["hashed_password"]):
                             print (f"[ERROR] Email '{username}' failed to log in. Please double check your password.")
+                            continue
+                        print (f"[STATUS] Email '{username}' log in successfully.")
                     elif response.status_code == 201:
                         response_data = response.json()
                         print(response_data["message"])
@@ -204,9 +200,7 @@ class ClientIO:
                         "username": username
                         })
                     if response.status_code == 200:
-                        response_data = response.json()
-                        aes_key = response_data["aes_key"]
-                        print(response_data["message"])
+                        aes_key = response.content
                     elif response.status_code == 400:
                         response_data = response.json()
                         print(response_data["message"])
@@ -225,6 +219,7 @@ class ClientIO:
                 flag_aes_key = True
             if not flag_recovery_key:
                 recovery_key = input('Enter your recovery key (or type "q" to EXIT, "b" to BACK):\n> ').strip()
+                print(recovery_key)
                 if recovery_key == "q":
                     return False, None
                 if recovery_key == "b":
@@ -255,13 +250,12 @@ class ClientIO:
                     continue
                 flag_new_password2 = True
         encrypted_aes_key, recovery_key = CryptoManager.encrypt_with_aes(new_password1)
-        hashed_new_password = CryptoManager.hash_password(new_password1)
+        hashed_new_password = CryptoManager.hash_password(new_password1) 
         try:
-            response = requests.post(f"{SERVER_URL}/reset_password", json={
+            response = requests.post(f"{SERVER_URL}/reset_password", data={
                 "username": username, 
                 "new_password": hashed_new_password,
-                "new_aes_key": encrypted_aes_key
-                })
+                }, files={"new_aes_key": encrypted_aes_key})
             if response.status_code == 200:
                 response_data = response.json()
                 print(response_data["message"])
@@ -300,9 +294,7 @@ class ClientIO:
                         "username": username
                         })
                     if response.status_code == 200:
-                        response_data = response.json()
-                        aes_key = response_data["aes_key"]
-                        print(response_data["message"])
+                        aes_key = response.content
                     elif response.status_code in [400, 401, 403]:
                         response_data = response.json()
                         print(response_data["message"])

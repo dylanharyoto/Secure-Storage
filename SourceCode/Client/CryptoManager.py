@@ -7,6 +7,7 @@ import hashlib
 from Crypto.PublicKey import RSA
 from Crypto.Cipher import PKCS1_OAEP
 import bcrypt
+import ast 
 import base64
 
 
@@ -23,14 +24,12 @@ class CryptoManager:
         cipher = AES.new(recovery_key, AES.MODE_CBC)
         encrypted_aes_key = cipher.encrypt(pad(combined_key, AES.block_size)) + cipher.iv
         return encrypted_aes_key, recovery_key
-    
     @staticmethod
     def generate_rsa_key_pair():
         key = RSA.generate(2048)
         secret_key = key.export_key()
         public_key = key.publickey().export_key()
         return secret_key, public_key
-    
     @staticmethod
     def encrypt_file_with_aes(password, aes_key, encrypted_file_path):
         password = password.encode('utf-8')
@@ -75,7 +74,7 @@ class CryptoManager:
     def verify_recovery_key(recovery_key, aes_key):
         key_iv = aes_key[48:]
         encrypted_aes_key = aes_key[:48]
-        cipher = AES.new(recovery_key, AES.MODE_CBC, key_iv)
+        cipher = AES.new(ast.literal_eval("b'" + recovery_key + "'"), AES.MODE_CBC, key_iv)
         combined_key = unpad(cipher.decrypt(encrypted_aes_key), AES.block_size)
         return (combined_key[:4] == b"true")
         
