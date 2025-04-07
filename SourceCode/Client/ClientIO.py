@@ -69,12 +69,11 @@ class ClientIO:
         secret_key, public_key = CryptoManager.generate_rsa_key_pair()
         hashed_password = CryptoManager.hash_password(password1)
         try:
-            response = requests.post(f"{SERVER_URL}/register_user", json={
+            response = requests.post(f"{SERVER_URL}/register_user", data={
                 "username": username, 
                 "password": hashed_password, 
-                "encrypted_aes_key": encrypted_aes_key, 
                 "public_key": public_key
-                })
+                }, files = {'encrypted_aes_key': encrypted_aes_key})    
             if response.status_code == 200:
                 response_data = response.json()
                 print(response_data["message"])
@@ -134,13 +133,18 @@ class ClientIO:
                     continue
                 hashed_password = CryptoManager.hash_password(password)
                 try:
+                    # Here, the login_user API is just to retrieved the stored hashA in server users database
                     response = requests.post(f"{SERVER_URL}/login_user", json={
                         "username": username, 
                         "password": hashed_password
                         })
                     if response.status_code == 200:
                         response_data = response.json()
-                        print(response_data["message"])
+                        auth_result = CryptoManager.check_password(password, response_data["hashed_password"])
+                        if auth_result:
+                            print (f"[STATUS] Email '{username}' log in successfully.")
+                        else:
+                            print (f"[ERROR] Email '{username}' failed to log in. Please double check your password.")
                     elif response.status_code == 201:
                         response_data = response.json()
                         print(response_data["message"])
@@ -501,7 +505,6 @@ class ClientIO:
         selected_usernames_id = None
         selected_usernames = []
         available_usernames = []
-        fetched_file = None
         try:
             response = requests.post(f"{SERVER_URL}/get_users")
             if response.status_code == 200:
@@ -648,7 +651,7 @@ class ClientIO:
             print(f"[ERROR] Network error: {error}.")
             return False
         return True
-
+    
     @staticmethod
     def download_file_IO(username, password):
         """

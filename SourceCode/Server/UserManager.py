@@ -13,10 +13,9 @@ class UserManager:
     def register_user(db_conn, username, password, encrypted_aes_key, public_key):
         """Register a new user with the provided details."""
         cursor = db_conn.cursor()
-        hashed_password = Utils.hash_password(password)
         cursor.execute(
             "INSERT INTO users (username, password, encrypted_aes_key, public_key) VALUES (?, ?, ?, ?)",
-            (username, hashed_password, encrypted_aes_key, public_key)
+            (username, password, encrypted_aes_key, public_key)
         )
         db_conn.commit()
         cursor.execute("SELECT * FROM users WHERE username = ?", (username,))
@@ -30,8 +29,8 @@ class UserManager:
         cursor.execute("SELECT password FROM users WHERE username = ?", (username,))
         result = cursor.fetchone()
         stored_hash = result[0]
-        result = Utils.check_password(password, stored_hash)
-        return result
+        return stored_hash
+            
     
     @staticmethod
     def reset_password(db_conn, username, new_password, new_aes):

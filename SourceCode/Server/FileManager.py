@@ -158,15 +158,15 @@ class FileManager:
     def get_aes_key(db_conn, username):
         """Retrieve aes key for a given username"""
         cursor = db_conn.cursor()
-        cursor.execute('''SELECT key FROM users WHERE username = ?''', (username,))
+        cursor.execute('''SELECT encrypted_aes_key FROM users WHERE username = ?''', (username,))
         user_aes = cursor.fetchone()
         return user_aes
     
     @staticmethod
     def get_rsa_key(db_conn, username):
-        """Retrieve aes key for a given username"""
+        """Retrieve publis RSA key for a given username"""
         cursor = db_conn.cursor()
-        cursor.execute('''SELECT pk FROM users WHERE username = ?''', (username,))
+        cursor.execute('''SELECT public_key FROM users WHERE username = ?''', (username,))
         user_rsa = cursor.fetchone()
         return user_rsa
 

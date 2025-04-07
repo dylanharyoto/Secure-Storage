@@ -20,14 +20,7 @@ class Utils:
             print(f"[ERROR] Database error: {error}")
         finally:
             conn.close()
-    @staticmethod
-    def hash_password(input_password):
-        """Hash a password using bcrypt."""
-        return bcrypt.hashpw(input_password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
-    @staticmethod
-    def check_password(input_password, hashed_password):
-        """Verify a password against a stored hash using bcrypt."""
-        return bcrypt.checkpw(input_password.encode("utf-8"), hashed_password.encode("utf-8"))
+   
     @staticmethod
     def check_username_regex(username):
         pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'

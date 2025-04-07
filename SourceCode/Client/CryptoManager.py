@@ -108,12 +108,16 @@ class CryptoManager:
         print(f"File decrypted and saved as {output_file_path}")
     
     @staticmethod
-    def hash_password(password):
-        password = password.encode('utf-8')
-        initial_hash = hmac.new(password, password, hashlib.sha512).digest()
-        salt = hmac.new(initial_hash, initial_hash, hashlib.sha512).digest()[:16]
-        base64_salt = base64.b64encode(salt).decode('utf-8')
-        base64_salt = base64_salt.replace('+', '.').replace('=', '')
-        bcrypt_salt = f"$2b${12}${base64_salt}".encode('utf-8')
-        hashed_password = bcrypt.hashpw(password, bcrypt_salt)
-        return hashed_password
+    def hash_password(input_password):
+        """Hash the password (HashA method) for log in authentication"""
+        salt = bcrypt.gensalt()
+        input_password = input_password.encode("utf-8")
+        return bcrypt.hashpw(input_password, salt)
+
+    
+    @staticmethod
+    def check_password(input_password, hashed_password):
+        """Verify a password with the same HashA method for log in authentication"""
+        input_password = input_password.encode("utf-8")
+        hashed_password = hashed_password.encode("utf-8")
+        return bcrypt.checkpw(input_password, hashed_password)
