@@ -94,7 +94,6 @@ class ClientIO:
         flag_password = False
         username = None
         password = None
-        hashed_password = None
         while not (flag_username and flag_password):
             if not flag_username:
                 username = input('Enter your email address (or type "q" to EXIT):\n> ').strip()
@@ -138,12 +137,10 @@ class ClientIO:
                         })
                     if response.status_code == 200:
                         response_data = response.json()
-                        auth_result = CryptoManager.check_password(password, response_data["hashed_password"])
-                        if auth_result:
-                            print (f"[STATUS] Email '{username}' log in successfully.")
-                        else:
+                        if not CryptoManager.check_password(password, response_data["hashed_password"]):
                             print (f"[ERROR] Email '{username}' failed to log in. Please double check your password.")
-                            return False, None, None
+                            continue
+                        print (f"[STATUS] Email '{username}' log in successfully.")
                     elif response.status_code == 201:
                         response_data = response.json()
                         print(response_data["message"])
@@ -203,9 +200,7 @@ class ClientIO:
                         "username": username
                         })
                     if response.status_code == 200:
-                        response_data = response.json()
-                        aes_key = response_data["aes_key"]
-                        print(response_data["message"])
+                        aes_key = response.content
                     elif response.status_code == 400:
                         response_data = response.json()
                         print(response_data["message"])

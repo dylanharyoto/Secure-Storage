@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, g
+from flask import Response, Flask, request, jsonify, g
 import sqlite3
 import os
 import sys
@@ -226,7 +226,8 @@ def get_aes_key():
         return jsonify({"message": f"[ERROR] {str(error)}."}), 403
     if not aes_key:
         return jsonify({"message": f"[ERROR] AES key for {username} is not found."}), 401
-    return jsonify({"message": f"[STATUS] AES key for {username} exists.", "aes_key": aes_key}), 200
+    return Response(aes_key, mimetype='application/octet-stream'), 200
+    #return jsonify({"message": f"[STATUS] AES key for {username} exists.", "aes_key": aes_key}), 200
 
 # Endpoint: Get RSA key
 @app.route('/get_rsa_key', methods=['POST'])
@@ -240,7 +241,8 @@ def get_rsa_key():
         return jsonify({"message": f"[ERROR] {str(error)}."}), 403
     if not rsa_key:
         return jsonify({"message": f"[ERROR] RSA key for {username} is not found."}), 401
-    return jsonify({"message": f"[STATUS] RSA key for {username} exists.", "rsa_key": rsa_key}), 200
+    return Response(rsa_key, mimetype='application/octet-stream'), 200
+    #return jsonify({"message": f"[STATUS] RSA key for {username} exists.", "rsa_key": rsa_key}), 200
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5100, debug=True)

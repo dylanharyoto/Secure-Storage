@@ -21,16 +21,12 @@ def run():
             if status and recovery_key and secret_key:
                 print(recovery_key)
                 print(secret_key)
-                print(f"[INFO] Registration sucessful.")
         elif choice == "2":
             status, username, password = ClientIO.login_user_IO()
             if status and username and password:
-                print("[INFO] Login successful.")
                 session(username, password)
         elif choice == "3":
             status, recovery_key = ClientIO.reset_password_IO()
-            if status:
-                print("[INFO] Password reset successful.")
         elif choice == "4":
             print("Exiting User Management...")
             break
