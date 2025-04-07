@@ -87,7 +87,6 @@ def reset_password():
     username = request.form.get('username')
     new_password = request.form.get('new_password')
     new_aes_key = request.files.get('new_aes_key').read()
-    #new_hashed_password = Utils.hash_password(new_password)
     if UserManager.reset_password(get_db(USERS_DB), username, new_password, new_aes_key):
         return jsonify({"message": f"[STATUS] Password for '{username}' reset successfully."}), 200
     return jsonify({"message": f"[ERROR] Password for '{username}' failed to be reset."}), 400
