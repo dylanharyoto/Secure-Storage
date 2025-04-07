@@ -219,7 +219,6 @@ class ClientIO:
                 flag_aes_key = True
             if not flag_recovery_key:
                 recovery_key = input('Enter your recovery key (or type "q" to EXIT, "b" to BACK):\n> ').strip()
-                print(recovery_key)
                 if recovery_key == "q":
                     return False, None
                 if recovery_key == "b":
@@ -270,6 +269,7 @@ class ClientIO:
             print(f"[ERROR] Network error: {error}.")
             return False, None
         return True, recovery_key
+    
     @staticmethod
     def upload_file_IO(username, password):
         file_path_flag = False

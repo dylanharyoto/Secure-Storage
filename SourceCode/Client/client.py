@@ -18,15 +18,15 @@ def run():
         choice = input("Enter your choice:\n> ").strip()
         if choice == "1":
             status, recovery_key, secret_key = ClientIO.register_user_IO()
-            if status and recovery_key and secret_key:
-                print(recovery_key)
-                print(secret_key)
+            print(recovery_key)
+            print(secret_key)
         elif choice == "2":
             status, username, password = ClientIO.login_user_IO()
             if status and username and password:
                 session(username, password)
         elif choice == "3":
             status, recovery_key = ClientIO.reset_password_IO()
+            print(recovery_key)
         elif choice == "4":
             print("Exiting User Management...")
             break
