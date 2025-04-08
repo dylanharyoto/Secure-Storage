@@ -150,22 +150,30 @@ def confirm_registration():
         return jsonify({"message": f"[STATUS] Email '{username}' registered successfully."}), 200
     return jsonify({"message": f"[ERROR] Email '{username}' failed to be registered."}), 400
 
+@app.route('/get_password', methods=['POST'])
+def get_password():
+    # Here, the get_password API is just to retrieved the stored hashA in server users database
+    data = request.json
+    username = data.get('username')
+    if not (username):
+        return jsonify({"message": "[ERROR] Missing username."}), 400
+    if not UserManager.check_username(get_db(USERS_DB), username):
+        return jsonify({"message": f"[ERROR] {username} has not registered yet."}), 201
+    hashed_password = UserManager.get_password(get_db(USERS_DB), username)
+    if hashed_password:
+        return jsonify({"message":"", "hashed_password": hashed_password}), 200
+
+
 @app.route('/request_login', methods=['POST'])
 def request_login():
     data = request.json
     username = data.get('username')
-    password = data.get('password').encode('utf-8')
-    if not (username and password):
-        return jsonify({"message": "[ERROR] Missing username or password."}), 400
-    if not UserManager.check_username(get_db(USERS_DB), username):
-        return jsonify({"message": f"[ERROR] {username} has not registered yet."}), 201
-    stored_hash = UserManager.login_user(get_db(USERS_DB), username)
-    if not bcrypt.checkpw(password, stored_hash):
-        return jsonify({"message": "[ERROR] Incorrect password."}), 401
+    if not (username):
+        return jsonify({"message": "[ERROR] Missing username."}), 400
     otp = OTPManager.generate_otp()
     OTPManager.store_otp(get_db(OTPS_DB), username, 'login', otp)
     send_otp_email(username, otp)
-    return jsonify({"message": "OTP sent to your email. Please enter the OTP to confirm login."}), 200
+    return jsonify({"message": "[STATUS] OTP sent to your email. Please enter the OTP to confirm login."}), 200
 
 @app.route('/confirm_login', methods=['POST'])
 def confirm_login():

@@ -22,7 +22,7 @@ class UserManager:
         return result
     
     @staticmethod
-    def login_user(db_conn, username):
+    def get_password(db_conn, username):
         """Authenticate a user by checking their password."""
         cursor = db_conn.cursor()
         cursor.execute("SELECT password FROM users WHERE username = ?", (username,))

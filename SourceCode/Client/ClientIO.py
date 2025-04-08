@@ -101,8 +101,11 @@ class ClientIO:
     def login_user_IO():
         flag_username = False
         flag_password = False
+        flag_send_otp = False
+        flag_otp = False
         username = None
         password = None
+        otp = None
         while not (flag_username and flag_password):
             if not flag_username:
                 username = input('Enter your email address (or type "q" to EXIT):\n> ').strip()
@@ -140,25 +143,69 @@ class ClientIO:
                     print("[ERROR] Password must be at least 8 characters long.")
                     continue
                 try:
-                    response = requests.post(f"{SERVER_URL}/request_login", json={"username": username, "password": password})
+                    response = requests.post(f"{SERVER_URL}/get_password", json={"username": username})
                     if response.status_code == 200:
-                        print(response.json()["message"])
-                        while True:
-                            otp = input("Enter the OTP sent to your email (or 'q' to quit): ").strip()
-                            if otp == 'q':
-                                return False, None, None
-                            confirm_response = requests.post(f"{SERVER_URL}/confirm_login", json={"username": username, "otp": otp})
-                            if confirm_response.status_code == 200:
-                                print(confirm_response.json()["message"])
-                                flag_password = True
-                            else:
-                                print(confirm_response.json()["message"])
+                        response_data = response.json()
+                        if not CryptoManager.check_password(password, response_data["hashed_password"]):
+                            print (f"[ERROR] Email '{username}' failed to log in. Please double check your password.")
+                            continue
+                        print (f"[STATUS] Email '{username}' log in successfully.")
+                    elif response.status_code == 201:
+                        response_data = response.json()
+                        print(response_data["message"])
+                        continue
+                    else:
+                        print("[ERROR] Server error.")
+                        return False, None, None
+                except requests.exceptions.RequestException as error:
+                    print(f"[ERROR] Network error: {error}.")
+                    return False, None, None
+                flag_password = True
+            if not flag_send_otp:
+                try:
+                    response = requests.post(f"{SERVER_URL}/request_login", json={"username": username})
+                    if response.status_code == 200:
+                        response_data = response.json()
+                        print(response_data["message"])
+                    elif response.status_code == 400:
+                        response_data = response.json()
+                        print(response_data["message"])
+                        flag_username = False
+                        flag_password = False
+                        continue
                     else:
                         print(response.json()["message"])
                         return False, None, None
                 except requests.exceptions.RequestException as error:
                     print(f"[ERROR] Network error: {error}.")
                     return False, None, None
+                flag_send_otp = True
+            if not flag_otp:
+                otp = input('Enter the OTP sent to your email (or type "q" to EXIT, "b" to BACK):\n> ').strip()
+                if otp == 'q':
+                    return False, None, None
+                if otp == 'b':
+                    flag_password = False
+                    flag_send_otp = False
+                    continue
+                try:
+                    response = requests.post(f"{SERVER_URL}/confirm_login", json={"username": username, "otp": otp})
+                    if response.status_code == 200:
+                        response_data = response.json()
+                        print(response_data["message"])
+                    elif response.status_code == 400:
+                        response_data = response.json()
+                        print(response_data["message"])
+                        flag_username = False
+                        flag_password = False
+                        continue
+                    else:
+                        print(response_data["message"])
+                        return False, None, None
+                except requests.exceptions.RequestException as error:
+                    print(f"[ERROR] Network error: {error}.")
+                    return False, None, None
+                flag_otp = True
         return True, username, password
     @staticmethod
     def reset_password_IO():
