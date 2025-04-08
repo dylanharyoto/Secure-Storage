@@ -6,8 +6,7 @@ class UserManager:
         """Check if a username exists in the users table."""
         cursor = db_conn.cursor()
         cursor.execute("SELECT * FROM Users WHERE username = ?", (username,))
-        result = cursor.fetchone() is not None
-        return result
+        return cursor.fetchone() is not None
 
     @staticmethod
     def register_user(db_conn, username, password, encrypted_aes_key, public_key):

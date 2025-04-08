@@ -2,14 +2,20 @@ from flask import Response, Flask, request, jsonify, g
 import sqlite3
 import os
 import sys
+import smtplib
+import bcrypt
+from email.mime.text import MIMEText
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 from SourceCode.Shared.Utils import Utils
 from SourceCode.Server.FileManager import FileManager
 from SourceCode.Server.UserManager import UserManager
+from SourceCode.Server.OTPManager import OTPManager
 
 # Table Names for g
 USERS_DB = "USERS_DB"
 FILES_DB = "FILES_DB"
+OTPS_DB = "OTPS_DB"
+PENDINGS_DB = "PENDINGS_DB"
 # Table Names for g
 
 # Table Schemas
@@ -26,17 +32,41 @@ files_schema = {
     "access": "TEXT NOT NULL",
     "content": "BLOB NOT NULL"
 }
+otps_schema = {
+    "username": "TEXT NOT NULL",
+    "otp_type": "TEXT NOT NULL",
+    "otp": "TEXT NOT NULL",
+    "timestamp": "INTEGER NOT NULL"
+}
+pending_registrations_schema = {
+    "username": "TEXT PRIMARY KEY",
+    "password": "BLOB NOT NULL",
+    "encrypted_aes_key": "BLOB NOT NULL",
+    "public_key": "BLOB NOT NULL"
+}
 # Table Schemas
 
 # Initialization
 app = Flask(__name__)
-app.config[USERS_DB] = os.path.join(os.path.dirname(__file__), "Database", "Users.db")
-app.config[FILES_DB] = os.path.join(os.path.dirname(__file__), "Database", "Files.db")
+app.config[USERS_DB] = os.path.join(os.path.dirname(__file__), "Database", "users.db")
+app.config[FILES_DB] = os.path.join(os.path.dirname(__file__), "Database", "files.db")
+app.config[OTPS_DB] = os.path.join(os.path.dirname(__file__), "Database", "otps.db")
+app.config[PENDINGS_DB] = os.path.join(os.path.dirname(__file__), "Database", "pendings.db")
 os.makedirs(os.path.dirname(app.config[USERS_DB]), exist_ok=True)
 os.makedirs(os.path.dirname(app.config[FILES_DB]), exist_ok=True)
-Utils.init_db(app.config[USERS_DB], "Users", users_schema)
-Utils.init_db(app.config[FILES_DB], "Files", files_schema)
+os.makedirs(os.path.dirname(app.config[OTPS_DB]), exist_ok=True)
+os.makedirs(os.path.dirname(app.config[PENDINGS_DB]), exist_ok=True)
+Utils.init_db(app.config[USERS_DB], "users", users_schema)
+Utils.init_db(app.config[FILES_DB], "files", files_schema)
+Utils.init_db(app.config[OTPS_DB], "otps", otps_schema)
+Utils.init_db(app.config[PENDINGS_DB], "pendings", pending_registrations_schema)
+with sqlite3.connect(app.config[OTPS_DB]) as conn:
+    cursor = conn.cursor()
+    cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_otps_unique ON otps (username, otp_type)")
+    conn.commit()
 # Initialization
+
+
 
 def get_db(config_key):
     """Get a database connection for the current request."""
@@ -53,6 +83,30 @@ def close_db(exception = None):
             getattr(g, attr).close()
             delattr(g, attr)
 
+
+def send_otp_email(to_email, otp):
+    """Send OTP to the user's email."""
+    from_email = "dylanharyoto.polyu@gmail.com"  # Replace with your email
+    from_password = "wyszwoimgqcycevd"  # Replace with your app-specific password
+    subject = "Your OTP Code"
+    message = f"Your OTP code is {otp}. It is valid for 10 minutes."
+
+    msg = MIMEText(message)
+    msg['Subject'] = subject
+    msg['From'] = from_email
+    msg['To'] = to_email
+
+    try:
+        server = smtplib.SMTP('smtp.gmail.com', 587)
+        server.starttls()
+        server.login(from_email, from_password)
+        server.sendmail(from_email, to_email, msg.as_string())
+        server.quit()
+        print(f"[STATUS] OTP sent to {to_email}")
+    except Exception as e:
+        print(f"[ERROR] Failed to send email: {e}")
+        raise
+
 @app.route('/check_username', methods=['POST'])
 def check_username():
     data = request.json
@@ -62,31 +116,93 @@ def check_username():
         return jsonify({"message": "[STATUS] Email exists."}), 200
     return jsonify({"message": "[STATUS] Email does not exist yet."}), 201
 
-@app.route('/register_user', methods=['POST'])
-def register_user():
+@app.route('/request_registration', methods=['POST'])
+def request_registration():
     username = request.form.get('username')
-    password = request.form.get('password')
+    password = request.form.get('password')  # Hashed password from client
     public_key = request.form.get('public_key')
     encrypted_aes_key = request.files.get('encrypted_aes_key').read()
+    if UserManager.check_username(get_db(USERS_DB), username):
+        return jsonify({"message": "[ERROR] Email already exists."}), 400
+    OTPManager.store_pending_registration(get_db(PENDINGS_DB), username, password, encrypted_aes_key, public_key)
+    otp = OTPManager.generate_otp()
+    OTPManager.store_otp(get_db(OTPS_DB), username, 'registration', otp)
+    send_otp_email(username, otp)
+    return jsonify({"message": "OTP sent to your email. Please enter the OTP to confirm registration."}), 200
+
+
+@app.route('/confirm_registration', methods=['POST'])
+def confirm_registration():
+    data = request.json
+    username = data.get('username')
+    otp = data.get('otp')
+    if not (username and otp):
+        return jsonify({"message": "[ERROR] Missing username or OTP."}), 400
+    success, message = OTPManager.verify_otp(get_db(OTPS_DB), username, 'registration', otp)
+    if not success:
+        return jsonify({"message": f"[ERROR] {message}."}), 401
+    result = OTPManager.get_pending_registration(get_db(PENDINGS_DB), username)
+    if not result:
+        return jsonify({"message": "[ERROR] No pending registration found."}), 400
+    password, encrypted_aes_key, public_key = result
     if UserManager.register_user(get_db(USERS_DB), username, password, encrypted_aes_key, public_key):
+        OTPManager.delete_pending_registration(get_db(PENDINGS_DB), username)
         return jsonify({"message": f"[STATUS] Email '{username}' registered successfully."}), 200
     return jsonify({"message": f"[ERROR] Email '{username}' failed to be registered."}), 400
 
-@app.route('/login_user', methods=['POST'])
-def login_user():
-    # Here, the login_user API is just to retrieved the stored hashA in server users database
+@app.route('/request_login', methods=['POST'])
+def request_login():
     data = request.json
     username = data.get('username')
-    hashed_password = UserManager.login_user(get_db(USERS_DB), username)
-    if hashed_password:
-        return jsonify({"message":"", "hashed_password": hashed_password}), 200
-    return jsonify({"message": f"[ERROR] {username} has not registered yet."}), 201
+    password = data.get('password').encode('utf-8')
+    if not (username and password):
+        return jsonify({"message": "[ERROR] Missing username or password."}), 400
+    if not UserManager.check_username(get_db(USERS_DB), username):
+        return jsonify({"message": f"[ERROR] {username} has not registered yet."}), 201
+    stored_hash = UserManager.login_user(get_db(USERS_DB), username)
+    if not bcrypt.checkpw(password, stored_hash):
+        return jsonify({"message": "[ERROR] Incorrect password."}), 401
+    otp = OTPManager.generate_otp()
+    OTPManager.store_otp(get_db(OTPS_DB), username, 'login', otp)
+    send_otp_email(username, otp)
+    return jsonify({"message": "OTP sent to your email. Please enter the OTP to confirm login."}), 200
 
-@app.route('/reset_password', methods=['POST'])
-def reset_password():
+@app.route('/confirm_login', methods=['POST'])
+def confirm_login():
+    data = request.json
+    username = data.get('username')
+    otp = data.get('otp')
+    if not (username and otp):
+        return jsonify({"message": "[ERROR] Missing username or OTP."}), 400
+    success, message = OTPManager.verify_otp(get_db(OTPS_DB), username, 'login', otp)
+    if success:
+        return jsonify({"message": f"[STATUS] Email '{username}' logged in successfully."}), 200
+    return jsonify({"message": f"[ERROR] {message}."}), 401
+
+@app.route('/request_reset_password', methods=['POST'])
+def request_reset_password():
+    data = request.json
+    username = data.get('username')
+    if not username:
+        return jsonify({"message": "[ERROR] Missing username."}), 400
+    if not UserManager.check_username(get_db(USERS_DB), username):
+        return jsonify({"message": f"[ERROR] {username} does not exist."}), 201
+    otp = OTPManager.generate_otp()
+    OTPManager.store_otp(get_db(OTPS_DB), username, 'reset', otp)
+    send_otp_email(username, otp)
+    return jsonify({"message": "OTP sent to your email. Please enter the OTP to reset password."}), 200
+
+@app.route('/confirm_reset_password', methods=['POST'])
+def confirm_reset_password():
     username = request.form.get('username')
-    new_password = request.form.get('new_password')
+    otp = request.form.get('otp')
+    new_password = request.form.get('new_password')  # Hashed new password
     new_aes_key = request.files.get('new_aes_key').read()
+    if not (username and otp and new_password and new_aes_key):
+        return jsonify({"message": "[ERROR] Missing required fields."}), 400
+    success, message = OTPManager.verify_otp(get_db(OTPS_DB), username, 'reset', otp)
+    if not success:
+        return jsonify({"message": f"[ERROR] {message}."}), 401
     if UserManager.reset_password(get_db(USERS_DB), username, new_password, new_aes_key):
         return jsonify({"message": f"[STATUS] Password for '{username}' reset successfully."}), 200
     return jsonify({"message": f"[ERROR] Password for '{username}' failed to be reset."}), 400

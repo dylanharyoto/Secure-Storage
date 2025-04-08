@@ -69,7 +69,7 @@ class ClientIO:
         secret_key, public_key = CryptoManager.generate_rsa_key_pair()
         hashed_password = CryptoManager.hash_password(password1)
         try:
-            response = requests.post(f"{SERVER_URL}/register_user", data={
+            response = requests.post(f"{SERVER_URL}/request_registration", data={
                 "username": username, 
                 "password": hashed_password, 
                 "public_key": public_key
@@ -77,6 +77,16 @@ class ClientIO:
             if response.status_code == 200:
                 response_data = response.json()
                 print(response_data["message"])
+                while True:
+                    otp = input("Enter the OTP sent to your email (or 'q' to quit): ").strip()
+                    if otp == 'q':
+                        return False, None, None
+                    confirm_response = requests.post(f"{SERVER_URL}/confirm_registration", json={"username": username, "otp": otp})
+                    if confirm_response.status_code == 200:
+                        print(confirm_response.json()["message"])
+                        return True, recovery_key, secret_key
+                    else:
+                        print(confirm_response.json()["message"])
             elif response.status_code == 400:
                 response_data = response.json()
                 print(response_data["message"])
@@ -87,7 +97,6 @@ class ClientIO:
         except requests.exceptions.RequestException as error:
             print(f"[ERROR] Network error: {error}.")
             return False, None, None
-        return True, recovery_key, secret_key
     @staticmethod
     def login_user_IO():
         flag_username = False
@@ -131,27 +140,25 @@ class ClientIO:
                     print("[ERROR] Password must be at least 8 characters long.")
                     continue
                 try:
-                    # Here, the login_user API is just to retrieved the stored hashA in server users database
-                    response = requests.post(f"{SERVER_URL}/login_user", json={
-                        "username": username
-                        })
+                    response = requests.post(f"{SERVER_URL}/request_login", json={"username": username, "password": password})
                     if response.status_code == 200:
-                        response_data = response.json()
-                        if not CryptoManager.check_password(password, response_data["hashed_password"]):
-                            print (f"[ERROR] Email '{username}' failed to log in. Please double check your password.")
-                            continue
-                        print (f"[STATUS] Email '{username}' log in successfully.")
-                    elif response.status_code == 201:
-                        response_data = response.json()
-                        print(response_data["message"])
-                        continue
+                        print(response.json()["message"])
+                        while True:
+                            otp = input("Enter the OTP sent to your email (or 'q' to quit): ").strip()
+                            if otp == 'q':
+                                return False, None, None
+                            confirm_response = requests.post(f"{SERVER_URL}/confirm_login", json={"username": username, "otp": otp})
+                            if confirm_response.status_code == 200:
+                                print(confirm_response.json()["message"])
+                                flag_password = True
+                            else:
+                                print(confirm_response.json()["message"])
                     else:
-                        print("[ERROR] Server error.")
+                        print(response.json()["message"])
                         return False, None, None
                 except requests.exceptions.RequestException as error:
                     print(f"[ERROR] Network error: {error}.")
                     return False, None, None
-                flag_password = True
         return True, username, password
     @staticmethod
     def reset_password_IO():
