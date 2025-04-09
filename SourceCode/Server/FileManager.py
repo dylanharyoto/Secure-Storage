@@ -18,6 +18,8 @@ class FileManager:
 
     @staticmethod
     def check_file_id(db_conn, username, file_id):
+        print(file_id)
+        print(username)
         cursor = db_conn.cursor()
         cursor.execute(
             "SELECT file_id FROM files WHERE file_id = ? AND owner = ?",
@@ -67,7 +69,7 @@ class FileManager:
         result = cursor.fetchone()
         if result and result[0] == username:
             cursor.execute("DELETE FROM files WHERE file_id = ?", (file_id,))
-            cursor.commit()
+            db_conn.commit()
         else:
             raise PermissionError("You do not have permission to delete this file.")
     @staticmethod
@@ -108,7 +110,7 @@ class FileManager:
             shared_file_name = "shared" + original_file_name
             cursor.execute(
                 "INSERT INTO files (file_id, owner, file_name, content, access) VALUES (?, ?, ?, ?, ?)",
-                (new_file_id, shared_user, shared_file_name, shared_content, "shared")
+                (new_file_id, shared_user, shared_file_name, bytes.fromhex(shared_content), "shared")
             )
             new_file_ids[shared_user] = new_file_id
         db_conn.commit()

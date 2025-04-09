@@ -55,8 +55,7 @@ def close_db(exception = None):
 
 @app.route('/check_username', methods=['POST'])
 def check_username():
-    data = request.json
-    username = data.get('username')
+    username = request.json.get('username')
     print(username)
     if UserManager.check_username(get_db(USERS_DB), username):
         return jsonify({"message": "[STATUS] Email exists."}), 200
@@ -75,8 +74,8 @@ def register_user():
 @app.route('/login_user', methods=['POST'])
 def login_user():
     # Here, the login_user API is just to retrieved the stored hashA in server users database
-    data = request.json
-    username = data.get('username')
+    
+    username = request.json.get('username')
     hashed_password = UserManager.login_user(get_db(USERS_DB), username)
     if hashed_password:
         return jsonify({"message":"", "hashed_password": hashed_password}), 200
@@ -93,13 +92,12 @@ def reset_password():
 
 @app.route('/check_file_id', methods=['POST'])
 def check_file_id():
-    data = request.json
-    username = data.get('username')
-    file_id = data.get('file_id')
+    username = request.json.get('username')
+    file_id = request.json.get('file_id')
     if not (username and file_id):
         return jsonify({"message": "[ERROR] Missing username or file."}), 400
     try:
-        result = FileManager.check_file_id(get_db(USERS_DB), username, file_id)
+        result = FileManager.check_file_id(get_db(FILES_DB), username, file_id)
     except Exception as error:
         return jsonify({"message": f"[ERROR] {str(error)}."}), 403
     if not result:
@@ -141,7 +139,7 @@ def delete_file():
     if not (username and file_id):
         return jsonify({"message": "[ERROR] Missing username or file_id."}), 400
     try:
-        FileManager.delete_file(get_db(FILES_DB), username, file_id) # to be chnaged when FileManager is static
+        FileManager.delete_file(get_db(FILES_DB), username, file_id) # to be changed when FileManager is static
     except Exception as error:
         return jsonify({"message": f"[ERROR] {str(error)}."}), 403
     return jsonify({"message": f"[STATUS] File '{file_id}' deleted successfully."}), 200
@@ -195,7 +193,7 @@ def view_file():
         # Assuming text content; adjust if binary data (e.g., use base64 encoding)
     except Exception as error:
         return jsonify({"message": f"[ERROR] {str(error)}."}), 403
-    return jsonify({"message":f"[STATUS] File '{file_id}' fetched successfully.", "content": content.decode(), "access": access}), 200
+    return jsonify({"message":f"[STATUS] File '{file_id}' fetched successfully.", "content": content.hex(), "access": access}), 200
     
 # Endpoint: Get users
 @app.route('/get_users', methods=['POST'])

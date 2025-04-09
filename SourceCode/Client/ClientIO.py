@@ -312,7 +312,7 @@ class ClientIO:
             response = requests.post(f"{SERVER_URL}/upload_file", 
                                      files=files, 
                                      data={'username': username})
-            data = response.json
+            data = response.json()
             if response.status_code == 200:
                 file_id = data["file_id"]
                 print(data["message"])
@@ -403,9 +403,7 @@ class ClientIO:
         try:
             response = requests.post(f"{SERVER_URL}/get_aes_key", json={'username': username})
             if response.status_code == 200:
-                response_data = response.json()
-                aes_key = response_data["aes_key"]
-                print(response_data["message"])
+                aes_key = response.content
             elif response.status_code == [400, 401, 403]:
                 response_data = response.json()
                 print(response_data["message"])
@@ -462,7 +460,9 @@ class ClientIO:
                     print(response_data["message"])
                     return False
                 else:
+                    response_data = response.json()
                     print("[ERROR] Server error.")
+                    print(response_data["message"])
                     return False
             except requests.exceptions.RequestException as error:
                 print(f"[ERROR] Network error: {error}.")
@@ -502,7 +502,8 @@ class ClientIO:
             if response.status_code == 200:
                 response_data = response.json()
                 usernames = response_data["usernames"]
-                available_usernames = usernames.split(',').sort()
+                available_usernames = usernames.split(',')
+                available_usernames.sort()
                 available_usernames.remove(username)
                 print(response_data["message"])
             elif response.status_code == 403:
@@ -634,9 +635,8 @@ class ClientIO:
         # Server return the encrypted file, and all pk for the selected users to share 
         for username in selected_usernames: 
             response = requests.post(f"{SERVER_URL}/get_rsa_key", json={'username': username}) # Need try... except... here, will add tmr
-            response_data = response.json()
-            user_rsa = response_data["rsa_key"]
-            share_data['share_info'][username] = CryptoManager.encrypt_file_for_sharing(user_rsa, fetched_file['content'])
+            user_rsa = response.content
+            share_data['share_info'][f"{username}"] = CryptoManager.encrypt_file_for_sharing(user_rsa, bytes.fromhex(fetched_file['content'])).hex()
         try:
             response = requests.post(f"{SERVER_URL}/share_file", json=share_data)
         except requests.exceptions.RequestException as error:
@@ -726,8 +726,7 @@ class ClientIO:
                 else:
                     response = requests.post(f"{SERVER_URL}/get_aes_key", json={'username': username})
                     if response.status_code == 200:
-                        response_data = response.json()
-                        print(response_data["message"])
+                        response_data = response.content
                     elif response.status_code in [400, 401, 403]:
                         response_data = response.json()
                         print(response_data["message"])
@@ -735,7 +734,7 @@ class ClientIO:
                     else:
                         print("[ERROR] Server error.")
                         return False
-                    CryptoManager.decrypt_file_with_aes(password, data["aes_key"], fetched_file['content'], file_path)
+                    CryptoManager.decrypt_file_with_aes(password, response_data["aes_key"], fetched_file['content'], file_path)
                 secret_key_flag = True
         return True
     @staticmethod
