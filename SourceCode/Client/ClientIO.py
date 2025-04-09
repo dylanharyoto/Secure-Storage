@@ -306,8 +306,9 @@ class ClientIO:
                     print(f"[ERROR] Network error: {error}.")
                     return False, None
                 aes_key_flag = True
-        encrypted_file_data = CryptoManager.encrypt_file_with_aes(password, aes_key, file_path) 
-        files = {'file': encrypted_file_data} # files = {'file': (os.path.basename(file_path), encrypted_file_data)}
+        encrypted_file_data = CryptoManager.encrypt_file_with_aes(password, aes_key, file_path)
+        print(encrypted_file_data)
+        files = {'file': (os.path.basename(file_path), encrypted_file_data.hex().encode())} # files = {'file': (os.path.basename(file_path), encrypted_file_data)}
         try:
             response = requests.post(f"{SERVER_URL}/upload_file", 
                                      files=files, 
@@ -650,13 +651,13 @@ class ClientIO:
         Download an existing file from the server to a specific directory.
         """
         file_id_flag = False
-        file_path_flag = False
+        stored_path_flag = False
         secret_key_flag = False
         file_id = None
-        file_path = None
+        stored_path = None
         secret_key = None
         fetched_file = None
-        while not (file_id_flag and file_path_flag and secret_key_flag):
+        while not (file_id_flag and stored_path_flag and secret_key_flag):
             if not (file_id_flag):
                 file_id = input("Please input the file ID for the file to be downloaded (or type \"q\" to EXIT):\n> ")
                 if file_id == "q":
@@ -687,15 +688,15 @@ class ClientIO:
                     print(f"[ERROR] Network error: {error}.")
                     return False
                 file_id_flag = True
-            if not (file_path_flag):
-                file_path = input("Please input the path of the file to be edited (or type \"q\" to EXIT, \"b\" to BACK):\n> ")
-                if file_path == "q":
+            if not (stored_path_flag):
+                stored_path = input("Please input the path of the target folder for the file to be stored (or type \"q\" to EXIT, \"b\" to BACK):\n> ")
+                if stored_path == "q":
                     return None
-                if file_path == "b":
+                if stored_path == "b":
                     file_id_flag = False
                     continue
-                if not os.path.isfile(file_path):
-                    print("[ERROR] Invalid file path or file does not exist.")
+                if not os.path.isdir(stored_path):
+                    print("[ERROR] Invalid directory path or directory does not exist.")
                     continue
                 payload = {'username': username, 'file_id': file_id}
                 try:
@@ -713,16 +714,19 @@ class ClientIO:
                 except requests.exceptions.RequestException as error:
                     print(f"[ERROR] Network error: {error}.")
                     return None
-                file_path_flag = True
+                stored_path_flag = True
             if not (secret_key_flag):
+                file_path = os.path.join(stored_path, fetched_file['file_name'])
+                fetched_content = bytes.fromhex(fetched_file['content'])
                 if fetched_file['access'] == 'shared':
                     secret_key = input("Please enter your secret key to decrypt, as the file is shared (or type \"q\" to EXIT, \"b\" to BACK):\n> ")
                     if secret_key == "q":
                         return False
                     elif secret_key == "b":
-                        file_path_flag = False
+                        stored_path_flag = False
                         continue
-                    CryptoManager.decrypt_shared_file(secret_key, fetched_file['content'], file_path)
+                    
+                    CryptoManager.decrypt_shared_file(secret_key, fetched_content, file_path)
                 else:
                     response = requests.post(f"{SERVER_URL}/get_aes_key", json={'username': username})
                     if response.status_code == 200:
@@ -734,7 +738,8 @@ class ClientIO:
                     else:
                         print("[ERROR] Server error.")
                         return False
-                    CryptoManager.decrypt_file_with_aes(password, response_data["aes_key"], fetched_file['content'], file_path)
+                    print(fetched_content)
+                    CryptoManager.decrypt_file_with_aes(password, response_data, fetched_content, file_path)
                 secret_key_flag = True
         return True
     @staticmethod

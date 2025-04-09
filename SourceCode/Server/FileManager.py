@@ -138,16 +138,16 @@ class FileManager:
         """
         cursor = db_conn.cursor()
         cursor.execute(
-            "SELECT owner, content, access FROM files WHERE file_id = ?",
+            "SELECT owner, content, access, file_name FROM files WHERE file_id = ?",
             (file_id,)
         )
         result = cursor.fetchone()
         if not result:
             raise ValueError("File not found.")
-        owner, content, access = result
+        owner, content, access, file_name = result
         if owner != username:
             raise PermissionError("You do not have permission to access this file.")
-        return content, access
+        return content, access, file_name
     @staticmethod
     def get_users(db_conn):
         """Return a list of all usernames from the users table."""
