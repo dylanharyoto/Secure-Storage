@@ -44,7 +44,7 @@ class FileManager:
         return file_id
     
     @staticmethod
-    def edit_file(db_conn, username, file_id, new_content):
+    def edit_file(db_conn, username, file_name, file_id, new_content):
         """
         Edit an existing file's content.
         Only allowed if the file is owned by the requesting user.
@@ -54,8 +54,8 @@ class FileManager:
         result = cursor.fetchone()
         if result and result[0] == username:
             cursor.execute(
-                "UPDATE files SET content = ? WHERE file_id = ?",
-                (new_content, file_id)
+                "UPDATE files SET content = ?, file_name = ? WHERE file_id = ?",
+                (new_content, file_name, file_id)
             )
             db_conn.commit()
         else:

@@ -161,7 +161,7 @@ class ClientIO:
         flag_new_password1 = False
         flag_new_password2 = False
         username = None
-        aes_key = None
+        original_encrypted_aes_key = None
         recovery_key = None
         new_password1 = None
         new_password2 = None
@@ -200,7 +200,7 @@ class ClientIO:
                         "username": username
                         })
                     if response.status_code == 200:
-                        aes_key = response.content
+                        original_encrypted_aes_key = response.content
                     elif response.status_code == 400:
                         response_data = response.json()
                         print(response_data["message"])
@@ -224,7 +224,8 @@ class ClientIO:
                 if recovery_key == "b":
                     flag_username = False
                     continue
-                if not CryptoManager.verify_recovery_key(recovery_key, aes_key):
+                aes_key = CryptoManager.verify_recovery_key(recovery_key, original_encrypted_aes_key)
+                if not aes_key:
                     print("[ERROR] Validation failed. Recovery key is incorrect.")
                     continue
                 print("[STATUS] Validation succeed. Recovery key is correct.")
@@ -248,7 +249,8 @@ class ClientIO:
                     print("[ERROR] Passwords do not match.")
                     continue
                 flag_new_password2 = True
-        encrypted_aes_key, recovery_key = CryptoManager.encrypt_with_aes(new_password1)
+        
+        encrypted_aes_key, recovery_key = CryptoManager.encrypt_with_aes(new_password1, aes_key)
         hashed_new_password = CryptoManager.hash_password(new_password1) 
         try:
             response = requests.post(f"{SERVER_URL}/reset_password", data={
@@ -307,7 +309,6 @@ class ClientIO:
                     return False, None
                 aes_key_flag = True
         encrypted_file_data = CryptoManager.encrypt_file_with_aes(password, aes_key, file_path)
-        print(encrypted_file_data)
         files = {'file': (os.path.basename(file_path), encrypted_file_data.hex().encode())} # files = {'file': (os.path.basename(file_path), encrypted_file_data)}
         try:
             response = requests.post(f"{SERVER_URL}/upload_file", 
@@ -391,7 +392,7 @@ class ClientIO:
                     return False     
                 file_id_flag = True
             if not file_path_flag:
-                file_path = input("Please input the path of the file to be edited (or type \"q\" to EXIT, \"b\" to BACK):\n> ")
+                file_path = input("Please input the path of the new file to replace the original one (or type \"q\" to EXIT, \"b\" to BACK):\n> ")
                 if file_path == "q":
                     return False
                 if file_path == "b":
@@ -416,9 +417,12 @@ class ClientIO:
             print(f"[ERROR] Network error: {error}.")
             return False        
         new_content = CryptoManager.encrypt_file_with_aes(password, aes_key, file_path)
-        payload = {'username': username, 'file_id': file_id, 'content': new_content}
+        files = {'file': (os.path.basename(file_path), new_content.hex().encode())}
         try:
-            response = requests.post(f"{SERVER_URL}/edit_file", json=payload)
+            response = requests.post(f"{SERVER_URL}/edit_file", 
+                                     files=files, 
+                                     data={'username': username,
+                                           'file_id': file_id})
             if response.status_code == 200:
                 response_data = response.json()
                 print(response_data["message"])
@@ -738,7 +742,6 @@ class ClientIO:
                     else:
                         print("[ERROR] Server error.")
                         return False
-                    print(fetched_content)
                     CryptoManager.decrypt_file_with_aes(password, response_data, fetched_content, file_path)
                 secret_key_flag = True
         return True

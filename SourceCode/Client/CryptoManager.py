@@ -15,9 +15,8 @@ import base64
 
 class CryptoManager:
     @staticmethod
-    def encrypt_with_aes(password):
-        password = password.encode('utf-8')
-        aes_key = get_random_bytes(32)
+    def encrypt_with_aes(password, aes_key=get_random_bytes(32)):
+        password = password.encode("utf-8")
         salt = hmac.new(password, password, hashlib.sha512).digest()[:16]
         recovery_key = PBKDF2(password, salt, dkLen=32, count=100000)
         combined_key = b"true" + aes_key
@@ -32,7 +31,7 @@ class CryptoManager:
         return secret_key, public_key
     @staticmethod
     def encrypt_file_with_aes(password, aes_key, encrypted_file_path):
-        password = password.encode('utf-8')
+        password = password.encode("utf-8")
         key_iv = aes_key[48:]
         encrypted_aes_key = aes_key[:48]
         salt = hmac.new(password, password, hashlib.sha512).digest()[:16]
@@ -50,7 +49,7 @@ class CryptoManager:
     
     @staticmethod
     def decrypt_file_with_aes(password, encrypted_key_data, file_data, output_file_path):
-        password = password.encode('utf-8')
+        password = password.encode("utf-8")
         iv = file_data[:16]
         ciphertext = file_data[16:]
         key_iv = encrypted_key_data[48:]
@@ -66,8 +65,8 @@ class CryptoManager:
             return
         cipher = AES.new(aes_key, AES.MODE_CBC, iv)
         plaintext = unpad(cipher.decrypt(ciphertext), AES.block_size)
-        with open(output_file_path, "w", encoding="utf-8") as file:
-            file.write(plaintext.decode("utf-8"))
+        with open(output_file_path, "wb") as file:
+            file.write(plaintext)
         print(f"Decryption successful! File saved as: {output_file_path}")
 
     @staticmethod
@@ -76,7 +75,9 @@ class CryptoManager:
         encrypted_aes_key = aes_key[:48]
         cipher = AES.new(ast.literal_eval("b'" + recovery_key + "'"), AES.MODE_CBC, key_iv)
         combined_key = unpad(cipher.decrypt(encrypted_aes_key), AES.block_size)
-        return (combined_key[:4] == b"true")
+        if combined_key[:4] == b"true":
+            return combined_key[4:]
+        return False
         
     @staticmethod
     def encrypt_file_for_sharing(public_key, plaintext):
