@@ -17,9 +17,6 @@ class UserManager:
             (username, password, encrypted_aes_key, public_key)
         )
         db_conn.commit()
-        cursor.execute("SELECT * FROM users WHERE username = ?", (username,))
-        result = cursor.fetchone() is not None
-        return result
     
     @staticmethod
     def get_password(db_conn, username):

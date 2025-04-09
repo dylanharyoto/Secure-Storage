@@ -66,8 +66,6 @@ with sqlite3.connect(app.config[OTPS_DB]) as conn:
     conn.commit()
 # Initialization
 
-
-
 def get_db(config_key):
     """Get a database connection for the current request."""
     db_attr = f'db_{config_key.lower()}'
@@ -82,7 +80,6 @@ def close_db(exception = None):
         if attr.startswith("db_") and attr.endswith("_db"):
             getattr(g, attr).close()
             delattr(g, attr)
-
 
 def send_otp_email(to_email, otp):
     """Send OTP to the user's email."""
@@ -111,44 +108,14 @@ def send_otp_email(to_email, otp):
 def check_username():
     data = request.json
     username = data.get('username')
-    print(username)
-    if UserManager.check_username(get_db(USERS_DB), username):
-        return jsonify({"message": "[STATUS] Email exists."}), 200
-    return jsonify({"message": "[STATUS] Email does not exist yet."}), 201
-
-@app.route('/request_registration', methods=['POST'])
-def request_registration():
-    username = request.form.get('username')
-    password = request.form.get('password')  # Hashed password from client
-    public_key = request.form.get('public_key')
-    encrypted_aes_key = request.files.get('encrypted_aes_key').read()
-    if UserManager.check_username(get_db(USERS_DB), username):
-        return jsonify({"message": "[ERROR] Email already exists."}), 400
-    OTPManager.store_pending_registration(get_db(PENDINGS_DB), username, password, encrypted_aes_key, public_key)
-    otp = OTPManager.generate_otp()
-    OTPManager.store_otp(get_db(OTPS_DB), username, 'registration', otp)
-    send_otp_email(username, otp)
-    return jsonify({"message": "OTP sent to your email. Please enter the OTP to confirm registration."}), 200
-
-
-@app.route('/confirm_registration', methods=['POST'])
-def confirm_registration():
-    data = request.json
-    username = data.get('username')
-    otp = data.get('otp')
-    if not (username and otp):
-        return jsonify({"message": "[ERROR] Missing username or OTP."}), 400
-    success, message = OTPManager.verify_otp(get_db(OTPS_DB), username, 'registration', otp)
-    if not success:
-        return jsonify({"message": f"[ERROR] {message}."}), 401
-    result = OTPManager.get_pending_registration(get_db(PENDINGS_DB), username)
-    if not result:
-        return jsonify({"message": "[ERROR] No pending registration found."}), 400
-    password, encrypted_aes_key, public_key = result
-    if UserManager.register_user(get_db(USERS_DB), username, password, encrypted_aes_key, public_key):
-        OTPManager.delete_pending_registration(get_db(PENDINGS_DB), username)
-        return jsonify({"message": f"[STATUS] Email '{username}' registered successfully."}), 200
-    return jsonify({"message": f"[ERROR] Email '{username}' failed to be registered."}), 400
+    if not (username):
+        return jsonify({"message": "[ERROR] Missing username."}), 400
+    try:
+        if not UserManager.check_username(get_db(USERS_DB), username):
+            return jsonify({"message": "[STATUS] Email does not exist yet."}), 201
+    except Exception as error:
+        return jsonify({"message": f"[ERROR] {str(error)}."}), 403
+    return jsonify({"message": "[STATUS] Email already exists."}), 200
 
 @app.route('/get_password', methods=['POST'])
 def get_password():
@@ -157,63 +124,120 @@ def get_password():
     username = data.get('username')
     if not (username):
         return jsonify({"message": "[ERROR] Missing username."}), 400
-    if not UserManager.check_username(get_db(USERS_DB), username):
-        return jsonify({"message": f"[ERROR] {username} has not registered yet."}), 201
+    try:
+        if not UserManager.check_username(get_db(USERS_DB), username):
+            return jsonify({"message": f"[ERROR] {username} has not registered yet."}), 201
+    except Exception as error:
+        return jsonify({"message": f"[ERROR] {str(error)}."}), 403
     hashed_password = UserManager.get_password(get_db(USERS_DB), username)
-    if hashed_password:
-        return jsonify({"message":"", "hashed_password": hashed_password}), 200
+    return jsonify({"message":"[STATUS] Hashed password fetched successfully.", "hashed_password": hashed_password}), 200
 
-
-@app.route('/request_login', methods=['POST'])
-def request_login():
-    data = request.json
-    username = data.get('username')
-    if not (username):
-        return jsonify({"message": "[ERROR] Missing username."}), 400
+@app.route('/get_registration_otp', methods=['POST'])
+def get_registration_otp():
+    username = request.form.get('username')
+    password = request.form.get('password')  # Hashed password from client
+    public_key = request.form.get('public_key')
+    encrypted_aes_key = request.files.get('encrypted_aes_key').read()
+    if not (username and password and public_key and encrypted_aes_key):
+        return jsonify({"message": "[ERROR] Missing username or password or public key or encrypted aes key."}), 400
+    try:
+        OTPManager.store_pending_registration(get_db(PENDINGS_DB), username, password, encrypted_aes_key, public_key)
+    except Exception as error:
+        return jsonify({"message": f"[ERROR] {str(error)}."}), 403
     otp = OTPManager.generate_otp()
-    OTPManager.store_otp(get_db(OTPS_DB), username, 'login', otp)
+    try:
+        OTPManager.store_otp(get_db(OTPS_DB), username, 'registration', otp)
+    except Exception as error:
+        return jsonify({"message": f"[ERROR] {str(error)}."}), 403
     send_otp_email(username, otp)
-    return jsonify({"message": "[STATUS] OTP sent to your email. Please enter the OTP to confirm login."}), 200
+    return jsonify({"message": "OTP sent to your email. Please check it."}), 200
 
-@app.route('/confirm_login', methods=['POST'])
-def confirm_login():
+@app.route('/verify_registration_otp', methods=['POST'])
+def verify_registration_otp():
     data = request.json
     username = data.get('username')
     otp = data.get('otp')
     if not (username and otp):
         return jsonify({"message": "[ERROR] Missing username or OTP."}), 400
-    success, message = OTPManager.verify_otp(get_db(OTPS_DB), username, 'login', otp)
-    if success:
-        return jsonify({"message": f"[STATUS] Email '{username}' logged in successfully."}), 200
-    return jsonify({"message": f"[ERROR] {message}."}), 401
+    try:
+        success, message = OTPManager.verify_otp(get_db(OTPS_DB), username, 'registration', otp)
+    except Exception as error:
+        return jsonify({"message": f"[ERROR] {str(error)}."}), 403
+    if not success:
+        return jsonify({"message": f"[ERROR] {message}."}), 201
+    try:
+        password, encrypted_aes_key, public_key = OTPManager.get_pending_registration(get_db(PENDINGS_DB), username)
+    except Exception as error:
+        return jsonify({"message": f"[ERROR] {str(error)}."}), 403
+    try:
+        UserManager.register_user(get_db(USERS_DB), username, password, encrypted_aes_key, public_key)
+    except Exception as error:
+        return jsonify({"message": f"[ERROR] {str(error)}."}), 403
+    OTPManager.delete_pending_registration(get_db(PENDINGS_DB), username)
+    return jsonify({"message": f"[STATUS] Email '{username}' registered successfully."}), 200
 
-@app.route('/request_reset_password', methods=['POST'])
-def request_reset_password():
+@app.route('/get_login_otp', methods=['POST'])
+def get_login_otp():
+    data = request.json
+    username = data.get('username')
+    if not (username):
+        return jsonify({"message": "[ERROR] Missing username."}), 400
+    otp = OTPManager.generate_otp()
+    try:
+        OTPManager.store_otp(get_db(OTPS_DB), username, 'login', otp)
+    except Exception as error:
+        return jsonify({"message": f"[ERROR] {str(error)}."}), 403
+    send_otp_email(username, otp)
+    return jsonify({"message": "[STATUS] OTP sent to your email. Please enter the OTP to confirm login."}), 200
+
+@app.route('/verify_login_otp', methods=['POST'])
+def verify_login_otp():
+    data = request.json
+    username = data.get('username')
+    otp = data.get('otp')
+    if not (username and otp):
+        return jsonify({"message": "[ERROR] Missing username or OTP."}), 400
+    try:
+        success, message = OTPManager.verify_otp(get_db(OTPS_DB), username, 'login', otp)
+    except Exception as error:
+        return jsonify({"message": f"[ERROR] {str(error)}."}), 403
+    if not success:
+        return jsonify({"message": f"[ERROR] {message}."}), 201
+    return jsonify({"message": f"[STATUS] Email '{username}' logged in successfully."}), 200
+
+@app.route('/get_reset_otp', methods=['POST'])
+def get_reset_otp():
     data = request.json
     username = data.get('username')
     if not username:
         return jsonify({"message": "[ERROR] Missing username."}), 400
-    if not UserManager.check_username(get_db(USERS_DB), username):
-        return jsonify({"message": f"[ERROR] {username} does not exist."}), 201
     otp = OTPManager.generate_otp()
-    OTPManager.store_otp(get_db(OTPS_DB), username, 'reset', otp)
+    try:
+        OTPManager.store_otp(get_db(OTPS_DB), username, 'reset', otp)
+    except Exception as error:
+        return jsonify({"message": f"[ERROR] {str(error)}."}), 403
     send_otp_email(username, otp)
     return jsonify({"message": "OTP sent to your email. Please enter the OTP to reset password."}), 200
 
-@app.route('/confirm_reset_password', methods=['POST'])
-def confirm_reset_password():
+@app.route('/verify_reset_otp', methods=['POST'])
+def verify_reset_otp():
     username = request.form.get('username')
     otp = request.form.get('otp')
-    new_password = request.form.get('new_password')  # Hashed new password
+    new_password = request.form.get('new_password')  
     new_aes_key = request.files.get('new_aes_key').read()
     if not (username and otp and new_password and new_aes_key):
         return jsonify({"message": "[ERROR] Missing required fields."}), 400
-    success, message = OTPManager.verify_otp(get_db(OTPS_DB), username, 'reset', otp)
+    try:
+        success, message = OTPManager.verify_otp(get_db(OTPS_DB), username, 'reset', otp)
+    except Exception as error:
+        return jsonify({"message": f"[ERROR] {str(error)}."}), 403
     if not success:
-        return jsonify({"message": f"[ERROR] {message}."}), 401
-    if UserManager.reset_password(get_db(USERS_DB), username, new_password, new_aes_key):
-        return jsonify({"message": f"[STATUS] Password for '{username}' reset successfully."}), 200
-    return jsonify({"message": f"[ERROR] Password for '{username}' failed to be reset."}), 400
+        return jsonify({"message": f"[ERROR] {message}."}), 201
+    try:
+        UserManager.reset_password(get_db(USERS_DB), username, new_password, new_aes_key)
+    except Exception as error:
+        return jsonify({"message": f"[ERROR] {str(error)}."}), 403
+    return jsonify({"message": f"[STATUS] Password for '{username}' reset successfully."}), 200
 
 @app.route('/check_file_id', methods=['POST'])
 def check_file_id():
