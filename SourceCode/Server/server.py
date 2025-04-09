@@ -8,6 +8,7 @@ from SourceCode.Shared.Utils import Utils
 from SourceCode.Server.FileManager import FileManager
 from SourceCode.Server.UserManager import UserManager
 from SourceCode.Server.OTPManager import OTPManager
+from SourceCode.Server.PendingManager import PendingManager
 
 # Table Names for g
 USERS_DB = "USERS_DB"
@@ -116,7 +117,7 @@ def get_registration_otp():
     if not (username and password and public_key and encrypted_aes_key):
         return jsonify({"message": "[ERROR] Missing username or password or public key or encrypted aes key."}), 400
     try:
-        OTPManager.store_pending_registration(get_db(PENDINGS_DB), username, password, encrypted_aes_key, public_key)
+        PendingManager.store_pending(get_db(PENDINGS_DB), username, password, encrypted_aes_key, public_key)
     except Exception as error:
         return jsonify({"message": f"[ERROR] {str(error)}."}), 403
     otp = OTPManager.generate_otp()
@@ -141,14 +142,14 @@ def verify_registration_otp():
     if not success:
         return jsonify({"message": f"[ERROR] {message}."}), 201
     try:
-        password, encrypted_aes_key, public_key = OTPManager.get_pending_registration(get_db(PENDINGS_DB), username)
+        password, encrypted_aes_key, public_key = PendingManager.get_pending(get_db(PENDINGS_DB), username)
     except Exception as error:
         return jsonify({"message": f"[ERROR] {str(error)}."}), 403
     try:
         UserManager.register_user(get_db(USERS_DB), username, password, encrypted_aes_key, public_key)
     except Exception as error:
         return jsonify({"message": f"[ERROR] {str(error)}."}), 403
-    OTPManager.delete_pending_registration(get_db(PENDINGS_DB), username)
+    PendingManager.delete_pending(get_db(PENDINGS_DB), username)
     return jsonify({"message": f"[STATUS] Email '{username}' registered successfully."}), 200
 
 @app.route('/get_login_otp', methods=['POST'])

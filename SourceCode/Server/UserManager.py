@@ -7,7 +7,6 @@ class UserManager:
         cursor = db_conn.cursor()
         cursor.execute("SELECT * FROM Users WHERE username = ?", (username,))
         return cursor.fetchone() is not None
-
     @staticmethod
     def register_user(db_conn, username, password, encrypted_aes_key, public_key):
         """Register a new user with the provided details."""
@@ -17,7 +16,6 @@ class UserManager:
             (username, password, encrypted_aes_key, public_key)
         )
         db_conn.commit()
-    
     @staticmethod
     def get_password(db_conn, username):
         """Authenticate a user by checking their password."""
@@ -26,8 +24,6 @@ class UserManager:
         result = cursor.fetchone()
         stored_hash = result[0]
         return stored_hash
-            
-    
     @staticmethod
     def reset_password(db_conn, username, new_password, new_aes):
         """Reset a user's password and AES key."""
