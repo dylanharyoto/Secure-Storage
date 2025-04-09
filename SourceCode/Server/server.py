@@ -2,9 +2,7 @@ from flask import Response, Flask, request, jsonify, g
 import sqlite3
 import os
 import sys
-import smtplib
 import bcrypt
-from email.mime.text import MIMEText
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 from SourceCode.Shared.Utils import Utils
 from SourceCode.Server.FileManager import FileManager
@@ -38,7 +36,7 @@ otps_schema = {
     "otp": "TEXT NOT NULL",
     "timestamp": "INTEGER NOT NULL"
 }
-pending_registrations_schema = {
+pendings_schema = {
     "username": "TEXT PRIMARY KEY",
     "password": "BLOB NOT NULL",
     "encrypted_aes_key": "BLOB NOT NULL",
@@ -59,7 +57,7 @@ os.makedirs(os.path.dirname(app.config[PENDINGS_DB]), exist_ok=True)
 Utils.init_db(app.config[USERS_DB], "users", users_schema)
 Utils.init_db(app.config[FILES_DB], "files", files_schema)
 Utils.init_db(app.config[OTPS_DB], "otps", otps_schema)
-Utils.init_db(app.config[PENDINGS_DB], "pendings", pending_registrations_schema)
+Utils.init_db(app.config[PENDINGS_DB], "pendings", pendings_schema)
 with sqlite3.connect(app.config[OTPS_DB]) as conn:
     cursor = conn.cursor()
     cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_otps_unique ON otps (username, otp_type)")
@@ -80,29 +78,6 @@ def close_db(exception = None):
         if attr.startswith("db_") and attr.endswith("_db"):
             getattr(g, attr).close()
             delattr(g, attr)
-
-def send_otp_email(to_email, otp):
-    """Send OTP to the user's email."""
-    from_email = "dylanharyoto.polyu@gmail.com"  # Replace with your email
-    from_password = "wyszwoimgqcycevd"  # Replace with your app-specific password
-    subject = "Your OTP Code"
-    message = f"Your OTP code is {otp}. It is valid for 10 minutes."
-
-    msg = MIMEText(message)
-    msg['Subject'] = subject
-    msg['From'] = from_email
-    msg['To'] = to_email
-
-    try:
-        server = smtplib.SMTP('smtp.gmail.com', 587)
-        server.starttls()
-        server.login(from_email, from_password)
-        server.sendmail(from_email, to_email, msg.as_string())
-        server.quit()
-        print(f"[STATUS] OTP sent to {to_email}")
-    except Exception as e:
-        print(f"[ERROR] Failed to send email: {e}")
-        raise
 
 @app.route('/check_username', methods=['POST'])
 def check_username():
@@ -135,7 +110,7 @@ def get_password():
 @app.route('/get_registration_otp', methods=['POST'])
 def get_registration_otp():
     username = request.form.get('username')
-    password = request.form.get('password')  # Hashed password from client
+    password = request.form.get('password')
     public_key = request.form.get('public_key')
     encrypted_aes_key = request.files.get('encrypted_aes_key').read()
     if not (username and password and public_key and encrypted_aes_key):
@@ -149,7 +124,7 @@ def get_registration_otp():
         OTPManager.store_otp(get_db(OTPS_DB), username, 'registration', otp)
     except Exception as error:
         return jsonify({"message": f"[ERROR] {str(error)}."}), 403
-    send_otp_email(username, otp)
+    OTPManager.send_otp(username, otp)
     return jsonify({"message": "OTP sent to your email. Please check it."}), 200
 
 @app.route('/verify_registration_otp', methods=['POST'])
@@ -187,7 +162,7 @@ def get_login_otp():
         OTPManager.store_otp(get_db(OTPS_DB), username, 'login', otp)
     except Exception as error:
         return jsonify({"message": f"[ERROR] {str(error)}."}), 403
-    send_otp_email(username, otp)
+    OTPManager.send_otp(username, otp)
     return jsonify({"message": "[STATUS] OTP sent to your email. Please enter the OTP to confirm login."}), 200
 
 @app.route('/verify_login_otp', methods=['POST'])
@@ -216,7 +191,7 @@ def get_reset_otp():
         OTPManager.store_otp(get_db(OTPS_DB), username, 'reset', otp)
     except Exception as error:
         return jsonify({"message": f"[ERROR] {str(error)}."}), 403
-    send_otp_email(username, otp)
+    OTPManager.send_otp(username, otp)
     return jsonify({"message": "OTP sent to your email. Please enter the OTP to reset password."}), 200
 
 @app.route('/verify_reset_otp', methods=['POST'])
