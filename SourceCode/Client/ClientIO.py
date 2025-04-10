@@ -465,9 +465,7 @@ class ClientIO:
                     print(response_data["message"])
                     return False
                 else:
-                    response_data = response.json()
                     print("[ERROR] Server error.")
-                    print(response_data["message"])
                     return False
             except requests.exceptions.RequestException as error:
                 print(f"[ERROR] Network error: {error}.")
