@@ -80,7 +80,7 @@ def close_db(exception = None):
             getattr(g, attr).close()
             delattr(g, attr)
 
-@app.route('/check_username', methods=['POST'])
+@app.route('/check_username', methods=['GET'])
 def check_username():
     data = request.json
     username = data.get('username')
@@ -93,7 +93,7 @@ def check_username():
         return jsonify({"message": f"[ERROR] {str(error)}."}), 403
     return jsonify({"message": "[STATUS] Email already exists."}), 200
 
-@app.route('/get_password', methods=['POST'])
+@app.route('/get_password', methods=['GET'])
 def get_password():
     # Here, the get_password API is just to retrieved the stored hashA in server users database
     data = request.json
@@ -108,7 +108,7 @@ def get_password():
     hashed_password = UserManager.get_password(get_db(USERS_DB), username)
     return jsonify({"message":"[STATUS] Hashed password fetched successfully.", "hashed_password": hashed_password}), 200
 
-@app.route('/get_registration_otp', methods=['POST'])
+@app.route('/get_registration_otp', methods=['GET'])
 def get_registration_otp():
     username = request.form.get('username')
     password = request.form.get('password')
@@ -155,7 +155,7 @@ def verify_registration_otp():
     PendingManager.delete_pending(get_db(PENDINGS_DB), username)
     return jsonify({"message": f"[STATUS] Email '{username}' registered successfully."}), 200
 
-@app.route('/get_login_otp', methods=['POST'])
+@app.route('/get_login_otp', methods=['GET'])
 def get_login_otp():
     data = request.json
     username = data.get('username')
@@ -187,7 +187,7 @@ def verify_login_otp():
             return jsonify({"message": f"[ERROR] {message.value}."}), 202
     return jsonify({"message": f"[STATUS] Email '{username}' logged in successfully."}), 200
 
-@app.route('/get_reset_otp', methods=['POST'])
+@app.route('/get_reset_otp', methods=['GET'])
 def get_reset_otp():
     data = request.json
     username = data.get('username')
@@ -224,7 +224,7 @@ def verify_reset_otp():
         return jsonify({"message": f"[ERROR] {str(error)}."}), 403
     return jsonify({"message": f"[STATUS] Password for '{username}' reset successfully."}), 200
 
-@app.route('/check_file_id', methods=['POST'])
+@app.route('/check_file_id', methods=['GET'])
 def check_file_id():
     data = request.json
     username = data.get('username')
@@ -305,7 +305,7 @@ def share_file():
         return jsonify({"message": f"[ERROR] {str(error)}."}), 403
 
 # Endpoint: Get all files for a user
-@app.route('/get_files', methods=['POST'])
+@app.route('/get_files', methods=['GET'])
 def get_files():
     username = request.json.get('username')
     if not username:
@@ -317,7 +317,7 @@ def get_files():
     return jsonify({"message": f"[STATUS] Files for {username} fetched successfully.", "files": files}), 200
 
 # Endpoint: View a file's content
-@app.route('/view_file', methods=['POST'])
+@app.route('/view_file', methods=['GET'])
 def view_file():
     username = request.json.get('username')
     file_id = request.json.get('file_id')
@@ -331,7 +331,7 @@ def view_file():
     return jsonify({"message":f"[STATUS] File '{file_id}' fetched successfully.", "content": content.decode(), "access": access}), 200
     
 # Endpoint: Get users
-@app.route('/get_users', methods=['POST'])
+@app.route('/get_users', methods=['GET'])
 def get_users():
     usernames = None
     try:
@@ -343,7 +343,7 @@ def get_users():
 
 
 # Endpoint: Get AES key
-@app.route('/get_aes_key', methods=['POST'])
+@app.route('/get_aes_key', methods=['GET'])
 def get_aes_key():
     username = request.json.get('username')
     if not (username):
@@ -358,7 +358,7 @@ def get_aes_key():
     #return jsonify({"message": f"[STATUS] AES key for {username} exists.", "aes_key": aes_key}), 200
 
 # Endpoint: Get RSA key
-@app.route('/get_rsa_key', methods=['POST'])
+@app.route('/get_rsa_key', methods=['GET'])
 def get_rsa_key():
     username = request.json.get('username')
     if not (username):

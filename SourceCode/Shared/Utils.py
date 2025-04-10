@@ -1,5 +1,4 @@
 import sqlite3
-import bcrypt
 import re
 class Utils:
     @staticmethod

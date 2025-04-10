@@ -30,7 +30,7 @@ class ClientIO:
                     print('[ERROR] Invalid email format.')
                     continue
                 try:
-                    response = requests.post(f"{SERVER_URL}/check_username", json={"username": username})
+                    response = requests.get(f"{SERVER_URL}/check_username", json={"username": username})
                     if response.status_code == 201:
                         response_data = response.json()
                         print(response_data["message"])
@@ -76,7 +76,7 @@ class ClientIO:
                 flag_password2 = True
             if not flag_send_otp:
                 try:
-                    response = requests.post(f"{SERVER_URL}/get_registration_otp", data={
+                    response = requests.get(f"{SERVER_URL}/get_registration_otp", data={
                         "username": username, 
                         "password": hashed_password, 
                         "public_key": public_key
@@ -165,7 +165,7 @@ class ClientIO:
                     print('[ERROR] Invalid email format.')
                     continue
                 try:
-                    response = requests.post(f"{SERVER_URL}/check_username", json={
+                    response = requests.get(f"{SERVER_URL}/check_username", json={
                         "username": username
                         })
                     if response.status_code == 200:
@@ -188,7 +188,7 @@ class ClientIO:
                 flag_username = True
             if not flag_get_password:
                 try:
-                    response = requests.post(f"{SERVER_URL}/get_password", json={"username": username})
+                    response = requests.get(f"{SERVER_URL}/get_password", json={"username": username})
                     if response.status_code == 200:
                         response_data = response.json()
                         print(response_data["message"])
@@ -227,7 +227,7 @@ class ClientIO:
                 flag_password = True
             if not flag_send_otp:
                 try:
-                    response = requests.post(f"{SERVER_URL}/get_login_otp", json={"username": username})
+                    response = requests.get(f"{SERVER_URL}/get_login_otp", json={"username": username})
                     if response.status_code == 200:
                         response_data = response.json()
                         print(response_data["message"])
@@ -317,7 +317,7 @@ class ClientIO:
                     print('[ERROR] Invalid email format.')
                     continue
                 try:
-                    response = requests.post(f"{SERVER_URL}/check_username", json={
+                    response = requests.get(f"{SERVER_URL}/check_username", json={
                         "username": username
                         })
                     if response.status_code == 200:
@@ -340,7 +340,7 @@ class ClientIO:
                 flag_username = True
             if not flag_aes_key:
                 try:
-                    response = requests.post(f"{SERVER_URL}/get_aes_key", json={
+                    response = requests.get(f"{SERVER_URL}/get_aes_key", json={
                         "username": username
                         })
                     if response.status_code == 200:
@@ -400,7 +400,7 @@ class ClientIO:
                 flag_new_password2 = True
             if not flag_send_otp:
                 try:
-                    response = requests.post(f"{SERVER_URL}/get_reset_otp", json={"username": username})
+                    response = requests.get(f"{SERVER_URL}/get_reset_otp", json={"username": username})
                     if response.status_code == 200:
                         response_data = response.json()
                         print(response_data["message"])
@@ -495,7 +495,7 @@ class ClientIO:
                 file_path_flag = True
             if not aes_key_flag:
                 try:
-                    response = requests.post(f"{SERVER_URL}/get_aes_key", json={
+                    response = requests.get(f"{SERVER_URL}/get_aes_key", json={
                         "username": username
                         })
                     if response.status_code == 200:
@@ -543,7 +543,7 @@ class ClientIO:
         while not (files_flag and file_path_flag and file_id_flag):
             if not files_flag:
                 try:
-                    response = requests.post(f"{SERVER_URL}/get_files", json={
+                    response = requests.get(f"{SERVER_URL}/get_files", json={
                         "username": username
                         })
                     if response.status_code == 200:
@@ -572,7 +572,7 @@ class ClientIO:
                     print('[ERROR] Invalid file ID format.')
                     continue
                 try:
-                    response = requests.post(f"{SERVER_URL}/check_file_id", json={
+                    response = requests.get(f"{SERVER_URL}/check_file_id", json={
                         "username": username, 
                         "file_id": file_id
                         })
@@ -606,7 +606,7 @@ class ClientIO:
                     continue
                 file_path_flag = True
         try:
-            response = requests.post(f"{SERVER_URL}/get_aes_key", json={'username': username})
+            response = requests.get(f"{SERVER_URL}/get_aes_key", json={'username': username})
             if response.status_code == 200:
                 response_data = response.json()
                 aes_key = response_data["aes_key"]
@@ -651,7 +651,7 @@ class ClientIO:
                 print('[ERROR] Invalid file ID format.')
                 continue
             try:
-                response = requests.post(f"{SERVER_URL}/check_file_id", json={
+                response = requests.get(f"{SERVER_URL}/check_file_id", json={
                     "username": username, 
                     "file_id": file_id
                     })
@@ -703,7 +703,7 @@ class ClientIO:
         selected_usernames = []
         available_usernames = []
         try:
-            response = requests.post(f"{SERVER_URL}/get_users")
+            response = requests.get(f"{SERVER_URL}/get_users")
             if response.status_code == 200:
                 response_data = response.json()
                 usernames = response_data["usernames"]
@@ -729,7 +729,7 @@ class ClientIO:
                     print('[ERROR] Invalid file ID format.')
                     continue
                 try:
-                    response = requests.post(f"{SERVER_URL}/check_file_id", json={
+                    response = requests.get(f"{SERVER_URL}/check_file_id", json={
                         "username": username, 
                         "file_id": file_id
                         })
@@ -814,7 +814,7 @@ class ClientIO:
         
         fetch_payload = {'username': username, 'file_id': file_id}
         try:
-            response = requests.post(f"{SERVER_URL}/view_file", json=fetch_payload)
+            response = requests.get(f"{SERVER_URL}/view_file", json=fetch_payload)
             if response.status_code == 200:
                 fetched_file = response.json()
                 print(fetched_file["message"])
@@ -838,7 +838,7 @@ class ClientIO:
 
         # Server return the encrypted file, and all pk for the selected users to share 
         for username in selected_usernames: 
-            response = requests.post(f"{SERVER_URL}/get_rsa_key", json={'username': username}) # Need try... except... here, will add tmr
+            response = requests.get(f"{SERVER_URL}/get_rsa_key", json={'username': username}) # Need try... except... here, will add tmr
             response_data = response.json()
             user_rsa = response_data["rsa_key"]
             share_data['share_info'][username] = CryptoManager.encrypt_file_for_sharing(user_rsa, fetched_file['content'])
@@ -870,7 +870,7 @@ class ClientIO:
                     print('[ERROR] Invalid file ID format.')
                     continue
                 try:
-                    response = requests.post(f"{SERVER_URL}/check_file_id", json={
+                    response = requests.get(f"{SERVER_URL}/check_file_id", json={
                         "username": username, 
                         "file_id": file_id
                         })
@@ -904,7 +904,7 @@ class ClientIO:
                     continue
                 payload = {'username': username, 'file_id': file_id}
                 try:
-                    response = requests.post(f"{SERVER_URL}/view_file", json=payload)
+                    response = requests.get(f"{SERVER_URL}/view_file", json=payload)
                     if response.status_code == 200:
                         fetched_file = response.json()
                         print(f"[STATUS] File '{file_id}' fetched successfully.")
@@ -929,7 +929,7 @@ class ClientIO:
                         continue
                     CryptoManager.decrypt_shared_file(secret_key, fetched_file['content'], file_path)
                 else:
-                    response = requests.post(f"{SERVER_URL}/get_aes_key", json={'username': username})
+                    response = requests.get(f"{SERVER_URL}/get_aes_key", json={'username': username})
                     if response.status_code == 200:
                         response_data = response.json()
                         print(response_data["message"])
@@ -950,7 +950,7 @@ class ClientIO:
         """
         files = None
         try:
-            response = requests.post(f"{SERVER_URL}/get_files", json={"username": username})
+            response = requests.get(f"{SERVER_URL}/get_files", json={"username": username})
             if response.status_code == 200:
                 fetched_files = response.json()
                 files = fetched_files['files']
