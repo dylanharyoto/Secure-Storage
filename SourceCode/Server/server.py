@@ -55,9 +55,7 @@ def close_db(exception = None):
 
 @app.route('/check_username', methods=['POST'])
 def check_username():
-    data = request.json
-    username = data.get('username')
-    print(username)
+    username = request.json.get('username')
     if UserManager.check_username(get_db(USERS_DB), username):
         return jsonify({"message": "[STATUS] Email exists."}), 200
     return jsonify({"message": "[STATUS] Email does not exist yet."}), 201
@@ -75,8 +73,8 @@ def register_user():
 @app.route('/login_user', methods=['POST'])
 def login_user():
     # Here, the login_user API is just to retrieved the stored hashA in server users database
-    data = request.json
-    username = data.get('username')
+    
+    username = request.json.get('username')
     hashed_password = UserManager.login_user(get_db(USERS_DB), username)
     if hashed_password:
         return jsonify({"message":"", "hashed_password": hashed_password}), 200
@@ -93,13 +91,12 @@ def reset_password():
 
 @app.route('/check_file_id', methods=['POST'])
 def check_file_id():
-    data = request.json
-    username = data.get('username')
-    file_id = data.get('file_id')
+    username = request.json.get('username')
+    file_id = request.json.get('file_id')
     if not (username and file_id):
         return jsonify({"message": "[ERROR] Missing username or file."}), 400
     try:
-        result = FileManager.check_file_id(get_db(USERS_DB), username, file_id)
+        result = FileManager.check_file_id(get_db(FILES_DB), username, file_id)
     except Exception as error:
         return jsonify({"message": f"[ERROR] {str(error)}."}), 403
     if not result:
@@ -114,7 +111,8 @@ def upload_file():
     if not (username and file):
         return jsonify({"message": "[ERROR] Missing username or file."}), 400
     try:
-        file_id = FileManager.upload_file(get_db(FILES_DB), username, file.filename, file.read())
+        file_data = bytes.fromhex(file.read().decode())
+        file_id = FileManager.upload_file(get_db(FILES_DB), username, file.filename, file_data)
     except Exception as error:
         return jsonify({"message": f"[ERROR] {str(error)}."}), 403
     return jsonify({"message": f"[STATUS] File '{file.filename}' uploaded successfully.", "file_id": file_id}), 200
@@ -122,13 +120,14 @@ def upload_file():
 # Endpoint: Edit a file (only if owned by the requester)
 @app.route('/edit_file', methods=['POST'])
 def edit_file():
-    username = request.json.get('username')
-    file_id = request.json.get('file_id')
-    new_content = request.json.get('content')
-    if not (username and file_id and new_content):
-        return jsonify({"message": "[ERROR] Missing username or file_id or new_content."}), 400
+    username = request.form.get('username')
+    file_id = request.form.get('file_id')
+    new_file = request.files.get('file')
+    if not (username and file_id and new_file):
+        return jsonify({"message": "[ERROR] Missing username or file_id or new_file."}), 400
     try:
-        FileManager.edit_file(username, file_id, new_content.encode()) # to be chnaged when FileManager is static
+        file_data = bytes.fromhex(new_file.read().decode())
+        FileManager.edit_file(get_db(FILES_DB), username, new_file.filename, file_id, file_data) # to be changed when FileManager is static
     except Exception as error:
         return jsonify({"message": f"[ERROR] {str(error)}."}), 403
     return jsonify({"message": "f[STATUS] File '{file_id}' uploaded successfully."}), 200
@@ -141,7 +140,7 @@ def delete_file():
     if not (username and file_id):
         return jsonify({"message": "[ERROR] Missing username or file_id."}), 400
     try:
-        FileManager.delete_file(get_db(FILES_DB), username, file_id) # to be chnaged when FileManager is static
+        FileManager.delete_file(get_db(FILES_DB), username, file_id) # to be changed when FileManager is static
     except Exception as error:
         return jsonify({"message": f"[ERROR] {str(error)}."}), 403
     return jsonify({"message": f"[STATUS] File '{file_id}' deleted successfully."}), 200
@@ -191,11 +190,11 @@ def view_file():
     if not (username and file_id):
         return jsonify({"message": "[ERROR] Missing username or file_id."}), 400
     try:
-        content, access = FileManager.view_file(get_db(FILES_DB), username, file_id)
+        content, access, file_name = FileManager.view_file(get_db(FILES_DB), username, file_id)
         # Assuming text content; adjust if binary data (e.g., use base64 encoding)
     except Exception as error:
         return jsonify({"message": f"[ERROR] {str(error)}."}), 403
-    return jsonify({"message":f"[STATUS] File '{file_id}' fetched successfully.", "content": content.decode(), "access": access}), 200
+    return jsonify({"message":f"[STATUS] File '{file_id}' fetched successfully.", "content": content.hex(), "access": access, "file_name": file_name}), 200
     
 # Endpoint: Get users
 @app.route('/get_users', methods=['POST'])
@@ -221,6 +220,7 @@ def get_aes_key():
         return jsonify({"message": f"[ERROR] {str(error)}."}), 403
     if not aes_key:
         return jsonify({"message": f"[ERROR] AES key for {username} is not found."}), 401
+    print(aes_key)
     return Response(aes_key, mimetype='application/octet-stream'), 200
     #return jsonify({"message": f"[STATUS] AES key for {username} exists.", "aes_key": aes_key}), 200
 

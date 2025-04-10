@@ -161,7 +161,7 @@ class ClientIO:
         flag_new_password1 = False
         flag_new_password2 = False
         username = None
-        aes_key = None
+        original_encrypted_aes_key = None
         recovery_key = None
         new_password1 = None
         new_password2 = None
@@ -200,7 +200,7 @@ class ClientIO:
                         "username": username
                         })
                     if response.status_code == 200:
-                        aes_key = response.content
+                        original_encrypted_aes_key = response.content
                     elif response.status_code == 400:
                         response_data = response.json()
                         print(response_data["message"])
@@ -224,7 +224,8 @@ class ClientIO:
                 if recovery_key == "b":
                     flag_username = False
                     continue
-                if not CryptoManager.verify_recovery_key(recovery_key, aes_key):
+                aes_key = CryptoManager.verify_recovery_key(recovery_key, original_encrypted_aes_key)
+                if not aes_key:
                     print("[ERROR] Validation failed. Recovery key is incorrect.")
                     continue
                 print("[STATUS] Validation succeed. Recovery key is correct.")
@@ -248,7 +249,8 @@ class ClientIO:
                     print("[ERROR] Passwords do not match.")
                     continue
                 flag_new_password2 = True
-        encrypted_aes_key, recovery_key = CryptoManager.encrypt_with_aes(new_password1)
+        
+        encrypted_aes_key, recovery_key = CryptoManager.encrypt_with_aes(new_password1, aes_key)
         hashed_new_password = CryptoManager.hash_password(new_password1) 
         try:
             response = requests.post(f"{SERVER_URL}/reset_password", data={
@@ -306,13 +308,13 @@ class ClientIO:
                     print(f"[ERROR] Network error: {error}.")
                     return False, None
                 aes_key_flag = True
-        encrypted_file_data = CryptoManager.encrypt_file_with_aes(password, aes_key, file_path) 
-        files = {'file': encrypted_file_data} # files = {'file': (os.path.basename(file_path), encrypted_file_data)}
+        encrypted_file_data = CryptoManager.encrypt_file_with_aes(password, aes_key, file_path)
+        files = {'file': (os.path.basename(file_path), encrypted_file_data.hex().encode())} # files = {'file': (os.path.basename(file_path), encrypted_file_data)}
         try:
             response = requests.post(f"{SERVER_URL}/upload_file", 
                                      files=files, 
                                      data={'username': username})
-            data = response.json
+            data = response.json()
             if response.status_code == 200:
                 file_id = data["file_id"]
                 print(data["message"])
@@ -390,7 +392,7 @@ class ClientIO:
                     return False     
                 file_id_flag = True
             if not file_path_flag:
-                file_path = input("Please input the path of the file to be edited (or type \"q\" to EXIT, \"b\" to BACK):\n> ")
+                file_path = input("Please input the path of the new file to replace the original one (or type \"q\" to EXIT, \"b\" to BACK):\n> ")
                 if file_path == "q":
                     return False
                 if file_path == "b":
@@ -403,9 +405,7 @@ class ClientIO:
         try:
             response = requests.post(f"{SERVER_URL}/get_aes_key", json={'username': username})
             if response.status_code == 200:
-                response_data = response.json()
-                aes_key = response_data["aes_key"]
-                print(response_data["message"])
+                aes_key = response.content
             elif response.status_code == [400, 401, 403]:
                 response_data = response.json()
                 print(response_data["message"])
@@ -417,9 +417,12 @@ class ClientIO:
             print(f"[ERROR] Network error: {error}.")
             return False        
         new_content = CryptoManager.encrypt_file_with_aes(password, aes_key, file_path)
-        payload = {'username': username, 'file_id': file_id, 'content': new_content}
+        files = {'file': (os.path.basename(file_path), new_content.hex().encode())}
         try:
-            response = requests.post(f"{SERVER_URL}/edit_file", json=payload)
+            response = requests.post(f"{SERVER_URL}/edit_file", 
+                                     files=files, 
+                                     data={'username': username,
+                                           'file_id': file_id})
             if response.status_code == 200:
                 response_data = response.json()
                 print(response_data["message"])
@@ -502,7 +505,8 @@ class ClientIO:
             if response.status_code == 200:
                 response_data = response.json()
                 usernames = response_data["usernames"]
-                available_usernames = usernames.split(',').sort()
+                available_usernames = usernames.split(',')
+                available_usernames.sort()
                 available_usernames.remove(username)
                 print(response_data["message"])
             elif response.status_code == 403:
@@ -634,9 +638,8 @@ class ClientIO:
         # Server return the encrypted file, and all pk for the selected users to share 
         for username in selected_usernames: 
             response = requests.post(f"{SERVER_URL}/get_rsa_key", json={'username': username}) # Need try... except... here, will add tmr
-            response_data = response.json()
-            user_rsa = response_data["rsa_key"]
-            share_data['share_info'][username] = CryptoManager.encrypt_file_for_sharing(user_rsa, fetched_file['content'])
+            user_rsa = response.content
+            share_data['share_info'][f"{username}"] = CryptoManager.encrypt_file_for_sharing(user_rsa, bytes.fromhex(fetched_file['content'])).hex()
         try:
             response = requests.post(f"{SERVER_URL}/share_file", json=share_data)
         except requests.exceptions.RequestException as error:
@@ -650,13 +653,13 @@ class ClientIO:
         Download an existing file from the server to a specific directory.
         """
         file_id_flag = False
-        file_path_flag = False
+        stored_path_flag = False
         secret_key_flag = False
         file_id = None
-        file_path = None
+        stored_path = None
         secret_key = None
         fetched_file = None
-        while not (file_id_flag and file_path_flag and secret_key_flag):
+        while not (file_id_flag and stored_path_flag and secret_key_flag):
             if not (file_id_flag):
                 file_id = input("Please input the file ID for the file to be downloaded (or type \"q\" to EXIT):\n> ")
                 if file_id == "q":
@@ -687,15 +690,15 @@ class ClientIO:
                     print(f"[ERROR] Network error: {error}.")
                     return False
                 file_id_flag = True
-            if not (file_path_flag):
-                file_path = input("Please input the path of the file to be edited (or type \"q\" to EXIT, \"b\" to BACK):\n> ")
-                if file_path == "q":
+            if not (stored_path_flag):
+                stored_path = input("Please input the path of the target folder for the file to be stored (or type \"q\" to EXIT, \"b\" to BACK):\n> ")
+                if stored_path == "q":
                     return None
-                if file_path == "b":
+                if stored_path == "b":
                     file_id_flag = False
                     continue
-                if not os.path.isfile(file_path):
-                    print("[ERROR] Invalid file path or file does not exist.")
+                if not os.path.isdir(stored_path):
+                    print("[ERROR] Invalid directory path or directory does not exist.")
                     continue
                 payload = {'username': username, 'file_id': file_id}
                 try:
@@ -713,21 +716,23 @@ class ClientIO:
                 except requests.exceptions.RequestException as error:
                     print(f"[ERROR] Network error: {error}.")
                     return None
-                file_path_flag = True
+                stored_path_flag = True
             if not (secret_key_flag):
+                file_path = os.path.join(stored_path, fetched_file['file_name'])
+                fetched_content = bytes.fromhex(fetched_file['content'])
                 if fetched_file['access'] == 'shared':
                     secret_key = input("Please enter your secret key to decrypt, as the file is shared (or type \"q\" to EXIT, \"b\" to BACK):\n> ")
                     if secret_key == "q":
                         return False
                     elif secret_key == "b":
-                        file_path_flag = False
+                        stored_path_flag = False
                         continue
-                    CryptoManager.decrypt_shared_file(secret_key, fetched_file['content'], file_path)
+                    
+                    CryptoManager.decrypt_shared_file(secret_key, fetched_content, file_path)
                 else:
                     response = requests.post(f"{SERVER_URL}/get_aes_key", json={'username': username})
                     if response.status_code == 200:
-                        response_data = response.json()
-                        print(response_data["message"])
+                        response_data = response.content
                     elif response.status_code in [400, 401, 403]:
                         response_data = response.json()
                         print(response_data["message"])
@@ -735,7 +740,7 @@ class ClientIO:
                     else:
                         print("[ERROR] Server error.")
                         return False
-                    CryptoManager.decrypt_file_with_aes(password, data["aes_key"], fetched_file['content'], file_path)
+                    CryptoManager.decrypt_file_with_aes(password, response_data, fetched_content, file_path)
                 secret_key_flag = True
         return True
     @staticmethod

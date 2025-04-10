@@ -42,7 +42,7 @@ class FileManager:
         return file_id
     
     @staticmethod
-    def edit_file(db_conn, username, file_id, new_content):
+    def edit_file(db_conn, username, file_name, file_id, new_content):
         """
         Edit an existing file's content.
         Only allowed if the file is owned by the requesting user.
@@ -52,8 +52,8 @@ class FileManager:
         result = cursor.fetchone()
         if result and result[0] == username:
             cursor.execute(
-                "UPDATE files SET content = ? WHERE file_id = ?",
-                (new_content, file_id)
+                "UPDATE files SET content = ?, file_name = ? WHERE file_id = ?",
+                (new_content, file_name, file_id)
             )
             db_conn.commit()
         else:
@@ -67,7 +67,7 @@ class FileManager:
         result = cursor.fetchone()
         if result and result[0] == username:
             cursor.execute("DELETE FROM files WHERE file_id = ?", (file_id,))
-            cursor.commit()
+            db_conn.commit()
         else:
             raise PermissionError("You do not have permission to delete this file.")
     @staticmethod
@@ -108,7 +108,7 @@ class FileManager:
             shared_file_name = "shared" + original_file_name
             cursor.execute(
                 "INSERT INTO files (file_id, owner, file_name, content, access) VALUES (?, ?, ?, ?, ?)",
-                (new_file_id, shared_user, shared_file_name, shared_content, "shared")
+                (new_file_id, shared_user, shared_file_name, bytes.fromhex(shared_content), "shared")
             )
             new_file_ids[shared_user] = new_file_id
         db_conn.commit()
@@ -136,16 +136,16 @@ class FileManager:
         """
         cursor = db_conn.cursor()
         cursor.execute(
-            "SELECT owner, content, access FROM files WHERE file_id = ?",
+            "SELECT owner, content, access, file_name FROM files WHERE file_id = ?",
             (file_id,)
         )
         result = cursor.fetchone()
         if not result:
             raise ValueError("File not found.")
-        owner, content, access = result
+        owner, content, access, file_name = result
         if owner != username:
             raise PermissionError("You do not have permission to access this file.")
-        return content, access
+        return content, access, file_name
     @staticmethod
     def get_users(db_conn):
         """Return a list of all usernames from the users table."""
