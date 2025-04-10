@@ -119,6 +119,10 @@ class ClientIO:
                     elif response.status_code == 201:
                         response_data = response.json()
                         print(response_data["message"])
+                        continue
+                    elif response.status_code == 202:
+                        response_data = response.json()
+                        print(response_data["message"])
                         flag_send_otp = False
                         continue
                     elif response.status_code == 400:
@@ -167,7 +171,7 @@ class ClientIO:
                     if response.status_code == 200:
                         response_data = response.json()
                         print(response_data["message"])
-                    elif response.status_code in [200, 400]:
+                    elif response.status_code in [201, 400]:
                         response_data = response.json()
                         print(response_data["message"])
                         continue
@@ -261,6 +265,10 @@ class ClientIO:
                     elif response.status_code == 201:
                         response_data = response.json()
                         print(response_data["message"])
+                        continue
+                    elif response.status_code == 202:
+                        response_data = response.json()
+                        print(response_data["message"])
                         flag_send_otp = False
                         continue
                     elif response.status_code == 400:
@@ -315,7 +323,7 @@ class ClientIO:
                     if response.status_code == 200:
                         response_data = response.json()
                         print(response_data["message"])
-                    elif response.status_code in [200, 400]:
+                    elif response.status_code in [201, 400]:
                         response_data = response.json()
                         print(response_data["message"])
                         continue
@@ -436,6 +444,10 @@ class ClientIO:
                         response_data = response.json()
                         print(response_data["message"])
                     elif response.status_code == 201:
+                        response_data = response.json()
+                        print(response_data["message"])
+                        continue
+                    elif response.status_code == 202:
                         response_data = response.json()
                         print(response_data["message"])
                         flag_send_otp = False

@@ -2,12 +2,12 @@ from flask import Response, Flask, request, jsonify, g
 import sqlite3
 import os
 import sys
-import bcrypt
+
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 from SourceCode.Shared.Utils import Utils
 from SourceCode.Server.FileManager import FileManager
 from SourceCode.Server.UserManager import UserManager
-from SourceCode.Server.OTPManager import OTPManager
+from SourceCode.Server.OTPManager import OTPManager, OTPMessage
 from SourceCode.Server.PendingManager import PendingManager
 
 # Table Names for g
@@ -126,7 +126,7 @@ def get_registration_otp():
     except Exception as error:
         return jsonify({"message": f"[ERROR] {str(error)}."}), 403
     OTPManager.send_otp(username, otp)
-    return jsonify({"message": "OTP sent to your email. Please check it."}), 200
+    return jsonify({"message": "[STATUS] OTP sent to your email. Please check it."}), 200
 
 @app.route('/verify_registration_otp', methods=['POST'])
 def verify_registration_otp():
@@ -140,7 +140,10 @@ def verify_registration_otp():
     except Exception as error:
         return jsonify({"message": f"[ERROR] {str(error)}."}), 403
     if not success:
-        return jsonify({"message": f"[ERROR] {message}."}), 201
+        if message == OTPMessage.INVALID:
+            return jsonify({"message": f"[ERROR] {message.value}."}), 201
+        else:
+            return jsonify({"message": f"[ERROR] {message.value}."}), 202
     try:
         password, encrypted_aes_key, public_key = PendingManager.get_pending(get_db(PENDINGS_DB), username)
     except Exception as error:
@@ -178,7 +181,10 @@ def verify_login_otp():
     except Exception as error:
         return jsonify({"message": f"[ERROR] {str(error)}."}), 403
     if not success:
-        return jsonify({"message": f"[ERROR] {message}."}), 201
+        if message == OTPMessage.INVALID:
+            return jsonify({"message": f"[ERROR] {message.value}."}), 201
+        else:
+            return jsonify({"message": f"[ERROR] {message.value}."}), 202
     return jsonify({"message": f"[STATUS] Email '{username}' logged in successfully."}), 200
 
 @app.route('/get_reset_otp', methods=['POST'])
@@ -208,7 +214,10 @@ def verify_reset_otp():
     except Exception as error:
         return jsonify({"message": f"[ERROR] {str(error)}."}), 403
     if not success:
-        return jsonify({"message": f"[ERROR] {message}."}), 201
+        if message == OTPMessage.INVALID:
+            return jsonify({"message": f"[ERROR] {message.value}."}), 201
+        else:
+            return jsonify({"message": f"[ERROR] {message.value}."}), 202
     try:
         UserManager.reset_password(get_db(USERS_DB), username, new_password, new_aes_key)
     except Exception as error:

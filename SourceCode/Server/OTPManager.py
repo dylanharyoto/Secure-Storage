@@ -2,6 +2,13 @@ import random
 import time
 import smtplib
 from email.mime.text import MIMEText
+from enum import Enum
+
+class OTPMessage(Enum):
+   EXPIRED = "OTP expired"
+   VERIFIED = "OTP verified"
+   INVALID = "OTP invalid"
+   NOT_FOUND = "OTP not found"
 
 class OTPManager:
     @staticmethod
@@ -52,13 +59,13 @@ class OTPManager:
             stored_otp, timestamp = result
             current_time = int(time.time())
             if current_time - timestamp > 600:  # 10-minute expiration
-                return False, "OTP expired"
+                return False, OTPMessage.EXPIRED
             if stored_otp == otp:
                 cursor.execute('''
                     DELETE FROM otps WHERE username = ? AND otp_type = ?
                 ''', (username, otp_type))
                 db_conn.commit()
-                return True, "OTP verified"
-            return False, "Invalid OTP"
-        return False, "No OTP found"
+                return True, OTPMessage.VERIFIED
+            return False, OTPMessage.INVALID
+        return False, OTPMessage.NOT_FOUND
     
