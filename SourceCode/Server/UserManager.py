@@ -6,9 +6,7 @@ class UserManager:
         """Check if a username exists in the users table."""
         cursor = db_conn.cursor()
         cursor.execute("SELECT * FROM Users WHERE username = ?", (username,))
-        result = cursor.fetchone() is not None
-        return result
-
+        return cursor.fetchone() is not None
     @staticmethod
     def register_user(db_conn, username, password, encrypted_aes_key, public_key):
         """Register a new user with the provided details."""
@@ -18,20 +16,14 @@ class UserManager:
             (username, password, encrypted_aes_key, public_key)
         )
         db_conn.commit()
-        cursor.execute("SELECT * FROM users WHERE username = ?", (username,))
-        result = cursor.fetchone() is not None
-        return result
-    
     @staticmethod
-    def login_user(db_conn, username):
+    def get_password(db_conn, username):
         """Authenticate a user by checking their password."""
         cursor = db_conn.cursor()
         cursor.execute("SELECT password FROM users WHERE username = ?", (username,))
         result = cursor.fetchone()
         stored_hash = result[0]
         return stored_hash
-            
-    
     @staticmethod
     def reset_password(db_conn, username, new_password, new_aes):
         """Reset a user's password and AES key."""

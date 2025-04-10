@@ -2,14 +2,19 @@ from flask import Response, Flask, request, jsonify, g
 import sqlite3
 import os
 import sys
+
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 from SourceCode.Shared.Utils import Utils
 from SourceCode.Server.FileManager import FileManager
 from SourceCode.Server.UserManager import UserManager
+from SourceCode.Server.OTPManager import OTPManager, OTPMessage
+from SourceCode.Server.PendingManager import PendingManager
 
 # Table Names for g
 USERS_DB = "USERS_DB"
 FILES_DB = "FILES_DB"
+OTPS_DB = "OTPS_DB"
+PENDINGS_DB = "PENDINGS_DB"
 # Table Names for g
 
 # Table Schemas
@@ -26,16 +31,38 @@ files_schema = {
     "access": "TEXT NOT NULL",
     "content": "BLOB NOT NULL"
 }
+otps_schema = {
+    "username": "TEXT NOT NULL",
+    "otp_type": "TEXT NOT NULL",
+    "otp": "TEXT NOT NULL",
+    "timestamp": "INTEGER NOT NULL"
+}
+pendings_schema = {
+    "username": "TEXT PRIMARY KEY",
+    "password": "BLOB NOT NULL",
+    "encrypted_aes_key": "BLOB NOT NULL",
+    "public_key": "BLOB NOT NULL"
+}
 # Table Schemas
 
 # Initialization
 app = Flask(__name__)
-app.config[USERS_DB] = os.path.join(os.path.dirname(__file__), "Database", "Users.db")
-app.config[FILES_DB] = os.path.join(os.path.dirname(__file__), "Database", "Files.db")
+app.config[USERS_DB] = os.path.join(os.path.dirname(__file__), "Database", "users.db")
+app.config[FILES_DB] = os.path.join(os.path.dirname(__file__), "Database", "files.db")
+app.config[OTPS_DB] = os.path.join(os.path.dirname(__file__), "Database", "otps.db")
+app.config[PENDINGS_DB] = os.path.join(os.path.dirname(__file__), "Database", "pendings.db")
 os.makedirs(os.path.dirname(app.config[USERS_DB]), exist_ok=True)
 os.makedirs(os.path.dirname(app.config[FILES_DB]), exist_ok=True)
-Utils.init_db(app.config[USERS_DB], "Users", users_schema)
-Utils.init_db(app.config[FILES_DB], "Files", files_schema)
+os.makedirs(os.path.dirname(app.config[OTPS_DB]), exist_ok=True)
+os.makedirs(os.path.dirname(app.config[PENDINGS_DB]), exist_ok=True)
+Utils.init_db(app.config[USERS_DB], "users", users_schema)
+Utils.init_db(app.config[FILES_DB], "files", files_schema)
+Utils.init_db(app.config[OTPS_DB], "otps", otps_schema)
+Utils.init_db(app.config[PENDINGS_DB], "pendings", pendings_schema)
+with sqlite3.connect(app.config[OTPS_DB]) as conn:
+    cursor = conn.cursor()
+    cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_otps_unique ON otps (username, otp_type)")
+    conn.commit()
 # Initialization
 
 def get_db(config_key):
@@ -53,43 +80,151 @@ def close_db(exception = None):
             getattr(g, attr).close()
             delattr(g, attr)
 
-@app.route('/check_username', methods=['POST'])
+@app.route('/check_username', methods=['GET'])
 def check_username():
-    username = request.json.get('username')
-    if UserManager.check_username(get_db(USERS_DB), username):
-        return jsonify({"message": "[STATUS] Email exists."}), 200
-    return jsonify({"message": "[STATUS] Email does not exist yet."}), 201
+    data = request.json
+    username = data.get('username')
+    if not (username):
+        return jsonify({"message": "[ERROR] Missing username."}), 400
+    try:
+        if not UserManager.check_username(get_db(USERS_DB), username):
+            return jsonify({"message": "[STATUS] Email does not exist yet."}), 201
+    except Exception as error:
+        return jsonify({"message": f"[ERROR] {str(error)}."}), 403
+    return jsonify({"message": "[STATUS] Email already exists."}), 200
 
-@app.route('/register_user', methods=['POST'])
-def register_user():
+@app.route('/get_password', methods=['GET'])
+def get_password():
+    # Here, the get_password API is just to retrieved the stored hashA in server users database
+    data = request.json
+    username = data.get('username')
+    if not (username):
+        return jsonify({"message": "[ERROR] Missing username."}), 400
+    try:
+        if not UserManager.check_username(get_db(USERS_DB), username):
+            return jsonify({"message": f"[ERROR] {username} has not registered yet."}), 201
+    except Exception as error:
+        return jsonify({"message": f"[ERROR] {str(error)}."}), 403
+    hashed_password = UserManager.get_password(get_db(USERS_DB), username)
+    return jsonify({"message":"[STATUS] Hashed password fetched successfully.", "hashed_password": hashed_password}), 200
+
+@app.route('/get_registration_otp', methods=['GET'])
+def get_registration_otp():
     username = request.form.get('username')
     password = request.form.get('password')
     public_key = request.form.get('public_key')
     encrypted_aes_key = request.files.get('encrypted_aes_key').read()
-    if UserManager.register_user(get_db(USERS_DB), username, password, encrypted_aes_key, public_key):
-        return jsonify({"message": f"[STATUS] Email '{username}' registered successfully."}), 200
-    return jsonify({"message": f"[ERROR] Email '{username}' failed to be registered."}), 400
+    if not (username and password and public_key and encrypted_aes_key):
+        return jsonify({"message": "[ERROR] Missing username or password or public key or encrypted aes key."}), 400
+    try:
+        PendingManager.store_pending(get_db(PENDINGS_DB), username, password, encrypted_aes_key, public_key)
+    except Exception as error:
+        return jsonify({"message": f"[ERROR] {str(error)}."}), 403
+    otp = OTPManager.generate_otp()
+    try:
+        OTPManager.store_otp(get_db(OTPS_DB), username, 'registration', otp)
+    except Exception as error:
+        return jsonify({"message": f"[ERROR] {str(error)}."}), 403
+    OTPManager.send_otp(username, otp)
+    return jsonify({"message": "[STATUS] OTP sent to your email. Please check it."}), 200
 
-@app.route('/login_user', methods=['POST'])
-def login_user():
-    # Here, the login_user API is just to retrieved the stored hashA in server users database
-    
-    username = request.json.get('username')
-    hashed_password = UserManager.login_user(get_db(USERS_DB), username)
-    if hashed_password:
-        return jsonify({"message":"", "hashed_password": hashed_password}), 200
-    return jsonify({"message": f"[ERROR] {username} has not registered yet."}), 201
+@app.route('/verify_registration_otp', methods=['POST'])
+def verify_registration_otp():
+    data = request.json
+    username = data.get('username')
+    otp = data.get('otp')
+    if not (username and otp):
+        return jsonify({"message": "[ERROR] Missing username or OTP."}), 400
+    try:
+        success, message = OTPManager.verify_otp(get_db(OTPS_DB), username, 'registration', otp)
+    except Exception as error:
+        return jsonify({"message": f"[ERROR] {str(error)}."}), 403
+    if not success:
+        if message == OTPMessage.INVALID:
+            return jsonify({"message": f"[ERROR] {message.value}."}), 201
+        else:
+            return jsonify({"message": f"[ERROR] {message.value}."}), 202
+    try:
+        password, encrypted_aes_key, public_key = PendingManager.get_pending(get_db(PENDINGS_DB), username)
+    except Exception as error:
+        return jsonify({"message": f"[ERROR] {str(error)}."}), 403
+    try:
+        UserManager.register_user(get_db(USERS_DB), username, password, encrypted_aes_key, public_key)
+    except Exception as error:
+        return jsonify({"message": f"[ERROR] {str(error)}."}), 403
+    PendingManager.delete_pending(get_db(PENDINGS_DB), username)
+    return jsonify({"message": f"[STATUS] Email '{username}' registered successfully."}), 200
 
-@app.route('/reset_password', methods=['POST'])
-def reset_password():
+@app.route('/get_login_otp', methods=['GET'])
+def get_login_otp():
+    data = request.json
+    username = data.get('username')
+    if not (username):
+        return jsonify({"message": "[ERROR] Missing username."}), 400
+    otp = OTPManager.generate_otp()
+    try:
+        OTPManager.store_otp(get_db(OTPS_DB), username, 'login', otp)
+    except Exception as error:
+        return jsonify({"message": f"[ERROR] {str(error)}."}), 403
+    OTPManager.send_otp(username, otp)
+    return jsonify({"message": "[STATUS] OTP sent to your email. Please enter the OTP to confirm login."}), 200
+
+@app.route('/verify_login_otp', methods=['POST'])
+def verify_login_otp():
+    data = request.json
+    username = data.get('username')
+    otp = data.get('otp')
+    if not (username and otp):
+        return jsonify({"message": "[ERROR] Missing username or OTP."}), 400
+    try:
+        success, message = OTPManager.verify_otp(get_db(OTPS_DB), username, 'login', otp)
+    except Exception as error:
+        return jsonify({"message": f"[ERROR] {str(error)}."}), 403
+    if not success:
+        if message == OTPMessage.INVALID:
+            return jsonify({"message": f"[ERROR] {message.value}."}), 201
+        else:
+            return jsonify({"message": f"[ERROR] {message.value}."}), 202
+    return jsonify({"message": f"[STATUS] Email '{username}' logged in successfully."}), 200
+
+@app.route('/get_reset_otp', methods=['GET'])
+def get_reset_otp():
+    data = request.json
+    username = data.get('username')
+    if not username:
+        return jsonify({"message": "[ERROR] Missing username."}), 400
+    otp = OTPManager.generate_otp()
+    try:
+        OTPManager.store_otp(get_db(OTPS_DB), username, 'reset', otp)
+    except Exception as error:
+        return jsonify({"message": f"[ERROR] {str(error)}."}), 403
+    OTPManager.send_otp(username, otp)
+    return jsonify({"message": "OTP sent to your email. Please enter the OTP to reset password."}), 200
+
+@app.route('/verify_reset_otp', methods=['POST'])
+def verify_reset_otp():
     username = request.form.get('username')
-    new_password = request.form.get('new_password')
+    otp = request.form.get('otp')
+    new_password = request.form.get('new_password')  
     new_aes_key = request.files.get('new_aes_key').read()
-    if UserManager.reset_password(get_db(USERS_DB), username, new_password, new_aes_key):
-        return jsonify({"message": f"[STATUS] Password for '{username}' reset successfully."}), 200
-    return jsonify({"message": f"[ERROR] Password for '{username}' failed to be reset."}), 400
+    if not (username and otp and new_password and new_aes_key):
+        return jsonify({"message": "[ERROR] Missing required fields."}), 400
+    try:
+        success, message = OTPManager.verify_otp(get_db(OTPS_DB), username, 'reset', otp)
+    except Exception as error:
+        return jsonify({"message": f"[ERROR] {str(error)}."}), 403
+    if not success:
+        if message == OTPMessage.INVALID:
+            return jsonify({"message": f"[ERROR] {message.value}."}), 201
+        else:
+            return jsonify({"message": f"[ERROR] {message.value}."}), 202
+    try:
+        UserManager.reset_password(get_db(USERS_DB), username, new_password, new_aes_key)
+    except Exception as error:
+        return jsonify({"message": f"[ERROR] {str(error)}."}), 403
+    return jsonify({"message": f"[STATUS] Password for '{username}' reset successfully."}), 200
 
-@app.route('/check_file_id', methods=['POST'])
+@app.route('/check_file_id', methods=['GET'])
 def check_file_id():
     username = request.json.get('username')
     file_id = request.json.get('file_id')
@@ -171,7 +306,7 @@ def share_file():
         return jsonify({"message": f"[ERROR] {str(error)}."}), 403
 
 # Endpoint: Get all files for a user
-@app.route('/get_files', methods=['POST'])
+@app.route('/get_files', methods=['GET'])
 def get_files():
     username = request.json.get('username')
     if not username:
@@ -183,7 +318,7 @@ def get_files():
     return jsonify({"message": f"[STATUS] Files for {username} fetched successfully.", "files": files}), 200
 
 # Endpoint: View a file's content
-@app.route('/view_file', methods=['POST'])
+@app.route('/view_file', methods=['GET'])
 def view_file():
     username = request.json.get('username')
     file_id = request.json.get('file_id')
@@ -197,7 +332,7 @@ def view_file():
     return jsonify({"message":f"[STATUS] File '{file_id}' fetched successfully.", "content": content.hex(), "access": access, "file_name": file_name}), 200
     
 # Endpoint: Get users
-@app.route('/get_users', methods=['POST'])
+@app.route('/get_users', methods=['GET'])
 def get_users():
     usernames = None
     try:
@@ -209,7 +344,7 @@ def get_users():
 
 
 # Endpoint: Get AES key
-@app.route('/get_aes_key', methods=['POST'])
+@app.route('/get_aes_key', methods=['GET'])
 def get_aes_key():
     username = request.json.get('username')
     if not (username):
@@ -225,7 +360,7 @@ def get_aes_key():
     #return jsonify({"message": f"[STATUS] AES key for {username} exists.", "aes_key": aes_key}), 200
 
 # Endpoint: Get RSA key
-@app.route('/get_rsa_key', methods=['POST'])
+@app.route('/get_rsa_key', methods=['GET'])
 def get_rsa_key():
     username = request.json.get('username')
     if not (username):
