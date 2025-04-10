@@ -18,8 +18,6 @@ class FileManager:
 
     @staticmethod
     def check_file_id(db_conn, username, file_id):
-        print(file_id)
-        print(username)
         cursor = db_conn.cursor()
         cursor.execute(
             "SELECT file_id FROM files WHERE file_id = ? AND owner = ?",

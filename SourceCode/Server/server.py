@@ -56,7 +56,6 @@ def close_db(exception = None):
 @app.route('/check_username', methods=['POST'])
 def check_username():
     username = request.json.get('username')
-    print(username)
     if UserManager.check_username(get_db(USERS_DB), username):
         return jsonify({"message": "[STATUS] Email exists."}), 200
     return jsonify({"message": "[STATUS] Email does not exist yet."}), 201
