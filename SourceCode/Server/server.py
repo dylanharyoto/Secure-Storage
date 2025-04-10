@@ -43,6 +43,14 @@ pendings_schema = {
     "encrypted_aes_key": "BLOB NOT NULL",
     "public_key": "BLOB NOT NULL"
 }
+logs_schema = {
+    "log_id": "INTEGER PRIMARY KEY AUTOINCREMENT",
+    "timestamp": "INTEGER NOT NULL",
+    "username": "TEXT NOT NULL",
+    "action": "TEXT NOT NULL",
+    "details": "TEXT",
+    "status": "TEXT NOT NULL"
+}
 # Table Schemas
 
 # Initialization
