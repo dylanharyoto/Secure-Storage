@@ -18,8 +18,9 @@ def run():
         choice = input("Enter your choice:\n> ").strip()
         if choice == "1":
             status, recovery_key, secret_key = ClientIO.register_user_IO()
-            print(recovery_key)
-            print(secret_key)
+            print(f"Recovery key: {str(recovery_key)[2:-1]}")
+            secret_key = ''.join(str(secret_key).split("\\n")[1:-1])
+            print(f"Recovery key: {secret_key}")
         elif choice == "2":
             status, username, password = ClientIO.login_user_IO()
             if status and username and password:
