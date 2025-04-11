@@ -13,6 +13,8 @@ class Utils:
                     {', '.join(columns)}
                 )
             ''')
+            if table_name == "otps":
+                cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_otps_unique ON otps (username, otp_type)")
             conn.commit()
             print(f"[STATUS] Table '{table_name}' initialized successfully in '{db_file_name}'.")
         except sqlite3.Error as error:

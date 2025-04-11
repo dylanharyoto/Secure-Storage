@@ -3,11 +3,7 @@ import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 from SourceCode.Client.ClientIO import ClientIO
 
-log_schema = {
-    "log_id": "INTEGER PRIMARY KEY AUTOINCREMENT",
-    "timestamp": "TEXT NOT NULL",
-    "message": "TEXT"
-}
+ADMIN_USER = "dylanharyoto.polyu@gmail.com"
 def run():
     while True:
         print("\nUser Management Menu:")
@@ -18,9 +14,8 @@ def run():
         choice = input("Enter your choice:\n> ").strip()
         if choice == "1":
             status, recovery_key, secret_key = ClientIO.register_user_IO()
-            print(f"Recovery key: {str(recovery_key)[2:-1]}")
-            secret_key = ''.join(str(secret_key).split("\\n")[1:-1])
-            print(f"Recovery key: {secret_key}")
+            print(recovery_key)
+            print(secret_key)
         elif choice == "2":
             status, username, password = ClientIO.login_user_IO()
             if status and username and password:
@@ -43,7 +38,11 @@ def session(username, password):
         print("4. Edit File")
         print("5. Delete File")
         print("6. Share File")
-        print("7. Log Out")
+        if username == ADMIN_USER:
+            print("7. Check Logs")
+            print("8. Log Out")
+        else:
+            print("7. Log Out")
         choice = input("Enter your choice:\n> ").strip()
         if choice == "1":
             ClientIO.check_file_IO(username)
@@ -58,6 +57,12 @@ def session(username, password):
         elif choice == "6":
             ClientIO.share_file_IO(username)
         elif choice == "7":
+            if username == ADMIN_USER:
+                ClientIO.view_logs_IO(username)
+            else:
+                print("User Logging Out...")
+                break
+        elif choice == "8" and username == ADMIN_USER:
             print("User Logging Out...")
             break
         else:
