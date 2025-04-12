@@ -17,7 +17,7 @@ class OTPManager:
     @staticmethod
     def send_otp(to_email, otp):
         from_email = "dylanharyoto.polyu@gmail.com" 
-        from_password = "wyszwoimgqcycevd" #dont change
+        from_password = "wyszwoimgqcycevd" # dont change
         subject = "Your OTP Code"
         message = f"Your OTP code is {otp}. It is valid for 10 minutes."
         msg = MIMEText(message)
