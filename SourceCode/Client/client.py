@@ -5,7 +5,6 @@ from SourceCode.Client.ClientIO import ClientIO
 from SourceCode.Server import config
 
 ADMIN_USER = config.ADMIN_USER
-ADMIN_PASSWORD = config.ADMIN_PASSWORD.strip()
 
 def run():
     while True:
@@ -16,16 +15,13 @@ def run():
         print("4. Exit")
         choice = input("Enter your choice:\n> ").strip()
         if choice == "1":
-            status, recovery_key, secret_key = ClientIO.register_user_IO()
-            print(recovery_key)
-            print(secret_key)
+            ClientIO.register_user_IO()
         elif choice == "2":
             status, username, password = ClientIO.login_user_IO()
             if status and username and password:
                 session(username, password)
         elif choice == "3":
-            status, recovery_key = ClientIO.reset_password_IO()
-            print(recovery_key)
+            ClientIO.reset_password_IO()
         elif choice == "4":
             print("Exiting User Management...")
             break
@@ -70,7 +66,6 @@ def session(username, password):
             break
         else:
             print("Invalid choice. Please try again.")
-    
 
 if __name__ == "__main__":
     run()

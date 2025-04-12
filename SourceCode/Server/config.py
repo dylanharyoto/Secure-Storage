@@ -8,7 +8,6 @@ SERVER_PORT = int(os.getenv('SERVER_PORT', '5100'))
 
 # Admin credentials
 ADMIN_USER = os.getenv('ADMIN_USER', 'dylanharyoto.polyu@gmail.com')
-ADMIN_PASSWORD = os.getenv('ADMIN_PASSWORD', 'admin12345')
 
 # Database table names (used as keys in Flask app.config)
 USERS_DB = "USERS_DB"

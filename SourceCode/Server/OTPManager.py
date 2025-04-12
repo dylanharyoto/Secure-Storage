@@ -2,6 +2,7 @@ import random
 import time
 import smtplib
 from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from enum import Enum
 
 class OTPMessage(Enum):
@@ -19,11 +20,20 @@ class OTPManager:
         from_email = "dylanharyoto.polyu@gmail.com" 
         from_password = "wyszwoimgqcycevd" # dont change
         subject = "Your OTP Code"
-        message = f"Your OTP code is {otp}. It is valid for 10 minutes."
-        msg = MIMEText(message)
+        body = (
+            "Dear User,\n\n"
+            f"Your OTP code is {otp}.\n"
+            "It is valid for 10 minutes.\n"
+            "Please store them safely and do not share them with anyone.\n\n"
+            "Best regards,\nCOMP3334 Group 10"
+        )
+        #message = f"Your OTP code is {otp}. It is valid for 10 minutes."
+        #msg = MIMEText(message)
+        msg = MIMEMultipart()
         msg['Subject'] = subject
         msg['From'] = from_email
         msg['To'] = to_email
+        msg.attach(MIMEText(body, 'plain'))
         try:
             server = smtplib.SMTP('smtp.gmail.com', 587)
             server.starttls()
