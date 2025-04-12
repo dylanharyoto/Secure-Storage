@@ -2,8 +2,11 @@ import sys
 import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 from SourceCode.Client.ClientIO import ClientIO
+from SourceCode.Server import config
 
-ADMIN_USER = "dylanharyoto.polyu@gmail.com"
+ADMIN_USER = config.ADMIN_USER
+ADMIN_PASSWORD = config.ADMIN_PASSWORD.strip()
+
 def run():
     while True:
         print("\nUser Management Menu:")

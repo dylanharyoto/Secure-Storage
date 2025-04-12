@@ -2,7 +2,6 @@ from flask import Response, Flask, request, jsonify, g
 import sqlite3
 import os
 import sys
-
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 from SourceCode.Server import config
 from SourceCode.Shared.Utils import Utils
@@ -11,7 +10,6 @@ from SourceCode.Server.UserManager import UserManager
 from SourceCode.Server.OTPManager import OTPManager, OTPMessage
 from SourceCode.Server.PendingManager import PendingManager
 from SourceCode.Server.LogManager import LogManager
-from SourceCode.Client.CryptoManager import CryptoManager
 
 app = Flask(__name__)
 app.config[config.USERS_DB] = os.path.join(os.path.dirname(__file__), "Database", "users.db")
@@ -21,7 +19,6 @@ app.config[config.PENDINGS_DB] = os.path.join(os.path.dirname(__file__), "Databa
 app.config[config.LOGS_DB] = os.path.join(os.path.dirname(__file__), "Database", "logs.db")
 os.makedirs(config.DB_DIR, exist_ok=True)
 
-# Table Schemas
 users_schema = {
     "username": "TEXT PRIMARY KEY",
     "password": "BLOB NOT NULL",
@@ -56,15 +53,11 @@ logs_schema = {
     "status": "TEXT NOT NULL"
 }
 
-# Initialization
 Utils.init_db(app.config[config.USERS_DB], "users", users_schema)
 Utils.init_db(app.config[config.FILES_DB], "files", files_schema)
 Utils.init_db(app.config[config.OTPS_DB], "otps", otps_schema)
 Utils.init_db(app.config[config.PENDINGS_DB], "pendings", pendings_schema)
 Utils.init_db(app.config[config.LOGS_DB], "logs", logs_schema)
-
-ADMIN_USER = config.ADMIN_USER
-ADMIN_PASSWORD = config.ADMIN_PASSWORD.strip()
 
 def get_db(config_key):
     """Get a database connection for the current request."""
@@ -81,24 +74,32 @@ def close_db(exception = None):
             getattr(g, attr).close()
             delattr(g, attr)
 
-def init_admin():
-    conn = sqlite3.connect(app.config[config.USERS_DB])
-    cursor = conn.cursor()
+@app.route('/get_logs', methods=['GET'])
+def get_logs():
+    data = request.json
+    username = data.get('username')
+    if not (username):
+        try:
+            if not LogManager.log_action(get_db(config.LOGS_DB), username or "unknown", "access_logs", "Missing username", "failure"):
+                return jsonify({"message": "[ERROR] Missing username."}), 400
+        except Exception as error:
+            return jsonify({"message": f"[ERROR] {str(error)}."}), 403
+    if username != config.ADMIN_USER:
+        try:
+            LogManager.log_action(get_db(config.LOGS_DB), username, "access_logs", "Failed to access logs: unauthorized", "failure")
+        except Exception as error:
+            return jsonify({"message": f"[ERROR] {str(error)}."}), 403
+        return jsonify({"message": "[ERROR] Unauthorized access."}), 403
     try:
-        encrypted_aes_key, _ = CryptoManager.encrypt_with_aes(ADMIN_PASSWORD)
-        _, public_key = CryptoManager.generate_rsa_key_pair()
-        hashed_password = CryptoManager.hash_password(ADMIN_PASSWORD)
-        cursor.execute(
-            "INSERT OR REPLACE INTO users (username, password, encrypted_aes_key, public_key) VALUES (?, ?, ?, ?)",
-            (ADMIN_USER, hashed_password, encrypted_aes_key, public_key)
-        )
-        conn.commit()
-        conn = sqlite3.connect(app.config[config.LOGS_DB])
-        print(f"[STATUS] Admin user '{ADMIN_USER}' replaced or inserted successfully.")        
-        LogManager.log_action(conn, ADMIN_USER, "admin_creation", "Admin user replaced or inserted", "success")
-    except sqlite3.Error as error:
-        print(f"[ERROR] Failed to replace or insert admin user: {str(error)}")
-        LogManager.log_action(conn, ADMIN_USER, "admin_creation", f"Failed: {str(error)}", "failure")
+        LogManager.log_action(get_db(config.LOGS_DB), username or "admin", "access_logs", "Accessed logs successfully", "success")
+    except Exception as error:
+            return jsonify({"message": f"[ERROR] {str(error)}."}), 403
+    try:
+        logs = LogManager.get_logs(get_db(config.LOGS_DB))
+    except Exception as error:
+        return jsonify({"message": f"[ERROR] {str(error)}."}), 403
+    log_list = [{"timestamp": row[0], "username": row[1], "action": row[2], "details": row[3], "status": row[4]} for row in logs]
+    return jsonify({"message": "[STATUS] Logs fetched successfully.", "logs": log_list}), 200
 
 @app.route('/check_username', methods=['GET'])
 def check_username():
@@ -410,24 +411,5 @@ def get_rsa_key():
     return Response(rsa_key, mimetype='application/octet-stream'), 200
     #return jsonify({"message": f"[STATUS] RSA key for {username} exists.", "rsa_key": rsa_key}), 200
 
-@app.route('/get_logs', methods=['GET'])
-def get_logs():
-    data = request.json
-    username = data.get('username')
-    if not (username):
-        LogManager.log_action(get_db(config.LOGS_DB), username or "unknown", "access_logs", "Missing username", "failure")
-        return jsonify({"message": "[ERROR] Missing username."}), 400
-    if username != "dylanharyoto.polyu@gmail.com":
-        LogManager.log_action(get_db(config.LOGS_DB), username, "access_logs", "Failed to access logs: unauthorized", "failure")
-        return jsonify({"message": "[ERROR] Unauthorized access."}), 403
-    LogManager.log_action(username or "admin", "access_logs", "Accessed logs successfully", "success")
-    try:
-        logs = LogManager.get_logs(get_db(config.LOGS_DB))
-    except Exception as error:
-        return jsonify({"message": f"[ERROR] {str(error)}."}), 403
-    log_list = [{"timestamp": row[0], "username": row[1], "action": row[2], "details": row[3], "status": row[4]} for row in logs]
-    return jsonify({"message": "[STATUS] Logs fetched successfully.", "logs": log_list}), 200
-
 if __name__ == "__main__":
-    init_admin()
     app.run(host="0.0.0.0", port=5100, debug=True)
