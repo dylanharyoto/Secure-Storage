@@ -1,18 +1,11 @@
-# Secure-Storage
-
-1. Open Terminal
-2. Split Terminal
-3. Run "python3 client.py" on one of the Terminal(s).
-4. Run "python3 server.py" on the other Terminal.
-
-init_database() is a function to initialize a .db file. The reason why it is in utils is, client may need that to make a db to store half of the AES key.
-
-When you boot up the server (run), the users.db will be created under /server/data, if not exist yet.
-
-Then, you can just interact with the client to register your username (email) and password.
-
-About hashing passwords, I am not sure if I should hash it in client or server. I asked gpt, it asked me to hash it in server. So the plain password is passed to the server, and hashed there. If this is not correct, we can change it. 
-
-You need to install "requests" and "flask" by doing "pip3 install requests" and "pip3 install flask" respectively.
-
-Server port is currently running on 5200. Change it if you need.
+# Secure-Storage Group 10
+1. Please install python>=3.11 from https://www.python.org/downloads/release/python-3110/ 
+2. Open Terminal/Powershell
+3. Split Terminal/Powershell as two tabs
+4. Both cd to Group10/code/, one further cd to Client folder, the other cd to Server folder
+5. In the code folder, pip install -r requirements.txt
+6. Run "python3 client.py" in the tab at the Client folder.
+7. Run "python3 server.py" in the other tab at the Server folder.
+8. Because we use OTP to implement two-factor authentication, the users left in the database (our personal emails for testing) cannot be logged in without getting the OTP from our emails. So we kindly request you to register with your email address as the username and log in with this email to test our project.
+9. To test the administrator's access to system log, To specify the administrator (by default it is an email controlled by us, you may change it as a valid email where you can receive emails), please go to /SourceCode/Server/config.py and change the "ADMIN_USER" constant accordingly. After specifying this "ADMIN_USER" constant, please go through the normal procedure as prompted by our system to register and log in to this administrator account when you want to check the system logs.   
+10. Thank you very much for your patience, time, and efforts in testing our project! We would be glad to respond to any questions related to this project with our coordinator's email: dylan.haryoto@connect.polyu.hk
