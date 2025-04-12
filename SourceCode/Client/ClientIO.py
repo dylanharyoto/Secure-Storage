@@ -72,6 +72,8 @@ class ClientIO:
                     continue
                 encrypted_aes_key, recovery_key = CryptoManager.encrypt_with_aes(password1)
                 secret_key, public_key = CryptoManager.generate_rsa_key_pair()
+                # send secret key and recovery key as attachments to user email 
+                Utils.send_registration_email(username, secret_key, recovery_key)
                 hashed_password = CryptoManager.hash_password(password1)
                 flag_password2 = True
             if not flag_send_otp:
@@ -861,7 +863,7 @@ class ClientIO:
         secret_key_flag = False
         file_id = None
         stored_path = None
-        secret_key = None
+        secret_key_path = None
         fetched_file = None
         while not (file_id_flag and stored_path_flag and secret_key_flag):
             if not (file_id_flag):
@@ -925,14 +927,15 @@ class ClientIO:
                 file_path = os.path.join(stored_path, fetched_file['file_name'])
                 fetched_content = bytes.fromhex(fetched_file['content'])
                 if fetched_file['access'] == 'shared':
-                    secret_key = input("Please enter your secret key to decrypt, as the file is shared (or type \"q\" to EXIT, \"b\" to BACK):\n> ")
-                    if secret_key == "q":
+                    secret_key_path = input("Please enter the file path of your secret key to decrypt, as the file is shared (or type \"q\" to EXIT, \"b\" to BACK):\n> ")
+                    if secret_key_path == "q":
                         return False
-                    elif secret_key == "b":
+                    elif secret_key_path == "b":
                         stored_path_flag = False
                         continue
-                    
-                    CryptoManager.decrypt_shared_file(secret_key, fetched_content, file_path)
+                    with open(secret_key_path, 'rb') as sk:
+                        sk
+                        CryptoManager.decrypt_shared_file(sk.read(), fetched_content, file_path)
                 else:
                     response = requests.get(f"{SERVER_URL}/get_aes_key", json={'username': username})
                     if response.status_code == 200:
