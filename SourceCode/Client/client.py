@@ -54,7 +54,7 @@ def session(username, password):
         elif choice == "5":
             ClientIO.delete_file_IO(username)
         elif choice == "6":
-            ClientIO.share_file_IO(username)
+            ClientIO.share_file_IO(username, password)
         elif choice == "7":
             if username == ADMIN_USER:
                 ClientIO.view_logs_IO(username)
