@@ -1,10 +1,10 @@
 import requests
+import time
 import os
 from SourceCode.Shared.Utils import Utils
 from SourceCode.Client.CryptoManager import CryptoManager
 
-SERVER_PORT = 5100
-SERVER_URL = os.getenv("SERVER_URL", f"http://localhost:{SERVER_PORT}")
+SERVER_URL = os.getenv("SERVER_URL", "http://localhost:5100")
 class ClientIO:
     @staticmethod
     def register_user_IO():
@@ -477,7 +477,6 @@ class ClientIO:
                     return False, None
                 flag_otp = True
         return True, recovery_key
-    
     @staticmethod
     def upload_file_IO(username, password):
         file_path_flag = False
@@ -852,7 +851,6 @@ class ClientIO:
             print(f"[ERROR] Network error: {error}.")
             return False
         return True
-    
     @staticmethod
     def download_file_IO(username, password):
         """
@@ -973,4 +971,34 @@ class ClientIO:
                 return False
         except requests.exceptions.RequestException as error:
             print(f"[ERROR] Network error: {error}.")
+        return True
+    @staticmethod
+    def view_logs_IO(username):
+        try:
+            response = requests.get(f"{SERVER_URL}/get_logs", json={"username": username})
+            if response.status_code == 200:
+                response_data = response.json()
+                print(response_data["message"])
+                logs = response_data["logs"]
+                if not logs:
+                    print("[STATUS] No logs available.")
+                else:
+                    print("[LOGS] Audit Logs:")
+                    for log in logs:
+                        timestamp = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(log["timestamp"]))
+                        print(f"- {timestamp} | User: {log['username']} | Action: {log['action']} | Details: {log['details']} | Status: {log['status']}")
+            elif response.status_code == 400:
+                response_data = response.json()
+                print(response_data["message"])
+                return False
+            elif response.status_code == 403:
+                response_data = response.json()
+                print(response_data["message"])
+                return False
+            else:
+                print("[ERROR] Server error.")
+                return False
+        except requests.exceptions.RequestException as error:
+            print(f"[ERROR] Network error: {error}.")
+            return False
         return True

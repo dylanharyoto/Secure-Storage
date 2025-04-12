@@ -13,13 +13,11 @@ class OTPMessage(Enum):
 class OTPManager:
     @staticmethod
     def generate_otp():
-        """Generate a 6-digit OTP."""
         return str(random.randint(100000, 999999))
     @staticmethod
     def send_otp(to_email, otp):
-        """Send OTP to the user's email."""
         from_email = "dylanharyoto.polyu@gmail.com" 
-        from_password = "wyszwoimgqcycevd" 
+        from_password = "wyszwoimgqcycevd" # dont change
         subject = "Your OTP Code"
         message = f"Your OTP code is {otp}. It is valid for 10 minutes."
         msg = MIMEText(message)
