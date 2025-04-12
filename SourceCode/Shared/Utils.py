@@ -4,6 +4,7 @@ import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.application import MIMEApplication
+import base64
 class Utils:
     @staticmethod
     def init_db(db_file_name, table_name, schema):
@@ -44,8 +45,8 @@ class Utils:
 
         Parameters:
         - to_email (str): The recipient's email address
-        - secret_key_content (str): The RSA secret key text
-        - recovery_key_content (str): The recovery key text
+        - secret_key_content (bytes): The RSA secret key 
+        - recovery_key_content (bytes): The recovery key 
         """
         from_email = "dylanharyoto.polyu@gmail.com"
         from_password = "wyszwoimgqcycevd"
@@ -65,13 +66,13 @@ class Utils:
         msg['To'] = to_email
         msg.attach(MIMEText(body, 'plain'))
 
-        # Attach secret_key.txt from string
-        secret_part = MIMEApplication(secret_key_content, Name="secret_key.txt")
+        # Attach secret_key.txt 
+        secret_part = MIMEApplication(base64.b64encode(secret_key_content).decode(), Name="secret_key.txt")
         secret_part['Content-Disposition'] = 'attachment; filename="secret_key.txt"'
         msg.attach(secret_part)
 
-        # Attach recovery_key.txt from string
-        recovery_part = MIMEApplication(recovery_key_content, Name="recovery_key.txt")
+        # Attach recovery_key.txt
+        recovery_part = MIMEApplication(base64.b64encode(recovery_key_content).decode(), Name="recovery_key.txt")
         recovery_part['Content-Disposition'] = 'attachment; filename="recovery_key.txt"'
         msg.attach(recovery_part)
 
@@ -86,3 +87,47 @@ class Utils:
         except Exception as e:
             print(f"[ERROR] Failed to send email: {e}")
             raise
+    
+    @staticmethod
+    def send_reset_password_email(to_email, recovery_key_content):
+        """
+        Send the updated recovery key to a user's email as an attachment.
+
+        Parameters:
+        - to_email (str): The recipient's email address
+        - recovery_key_content (byte): The recovery key text
+        """
+        from_email = "dylanharyoto.polyu@gmail.com"
+        from_password = "wyszwoimgqcycevd"
+        subject = "Your Updated Recovery Key after Resetting Password"
+        body = (
+            "Dear User,\n\n"
+            "Attached are your confidential keys:\n"
+            "recovery_key.txt: Your Recovery Key\n\n"
+            "Please store them safely and do not share them with anyone.\n\n"
+            "Best regards,\nCOMP3334 Group 10"
+        )
+
+        msg = MIMEMultipart()
+        msg['Subject'] = subject
+        msg['From'] = from_email
+        msg['To'] = to_email
+        msg.attach(MIMEText(body, 'plain'))
+
+        # Attach recovery_key.txt from string
+        recovery_part = MIMEApplication(base64.b64encode(recovery_key_content).decode(), Name="recovery_key.txt")
+        recovery_part['Content-Disposition'] = 'attachment; filename="recovery_key.txt"'
+        msg.attach(recovery_part)
+
+        # Send the email
+        try:
+            server = smtplib.SMTP('smtp.gmail.com', 587)
+            server.starttls()
+            server.login(from_email, from_password)
+            server.sendmail(from_email, to_email, msg.as_string())
+            server.quit()
+            print(f"[STATUS] Email sent to {to_email} with the updated recovery key.")
+        except Exception as e:
+            print(f"[ERROR] Failed to send email: {e}")
+            raise
+    

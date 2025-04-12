@@ -304,11 +304,10 @@ class ClientIO:
         flag_otp = False
         username = None
         original_encrypted_aes_key = None
-        recovery_key = None
+        recovery_key_path = None
         new_password1 = None
         new_password2 = None
         encrypted_aes_key = None
-        recovery_key = None
         hashed_new_password = None
         while not (flag_username and flag_aes_key and flag_recovery_key and flag_new_password1 and flag_new_password2 and flag_send_otp and flag_otp):
             if not flag_username:
@@ -364,14 +363,18 @@ class ClientIO:
                     return False, None
                 flag_aes_key = True
             if not flag_recovery_key:
-                recovery_key = input('Enter your recovery key (or type "q" to EXIT, "b" to BACK):\n> ').strip()
-                if recovery_key == "q":
+                recovery_key_path = input('Enter the file path of your recovery key (or type "q" to EXIT, "b" to BACK):\n> ').strip()
+                if recovery_key_path == "q":
                     return False, None
-                if recovery_key == "b":
+                if recovery_key_path == "b":
                     flag_username = False
                     flag_aes_key = False
                     continue
-                aes_key = CryptoManager.verify_recovery_key(recovery_key, original_encrypted_aes_key)
+                if not os.path.isfile(recovery_key_path):
+                    print("[ERROR] Invalid recovery_key file path or file does not exist.")
+                    continue
+                with open(recovery_key_path, 'r') as recovery_key:
+                    aes_key = CryptoManager.verify_recovery_key(recovery_key.read(), original_encrypted_aes_key)
                 if not aes_key:
                     print("[ERROR] Validation failed. Recovery key is incorrect.")
                     continue
@@ -399,6 +402,8 @@ class ClientIO:
                     print("[ERROR] Passwords do not match.")
                     continue
                 encrypted_aes_key, recovery_key = CryptoManager.encrypt_with_aes(new_password1, aes_key)
+                # send secret key and recovery key as attachments to user email 
+                Utils.send_reset_password_email(username, recovery_key)
                 hashed_new_password = CryptoManager.hash_password(new_password1) 
                 flag_new_password2 = True
             if not flag_send_otp:
@@ -931,8 +936,10 @@ class ClientIO:
                     elif secret_key_path == "b":
                         stored_path_flag = False
                         continue
-                    with open(secret_key_path, 'rb') as sk:
-                        sk
+                    if not os.path.isfile(secret_key_path):
+                        print("[ERROR] Invalid secret_key file path or file does not exist.")
+                        continue
+                    with open(secret_key_path, 'r') as sk:
                         CryptoManager.decrypt_shared_file(sk.read(), fetched_content, file_path)
                 else:
                     response = requests.get(f"{SERVER_URL}/get_aes_key", json={'username': username})
