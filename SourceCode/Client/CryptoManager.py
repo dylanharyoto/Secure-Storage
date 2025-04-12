@@ -8,7 +8,6 @@ from Crypto.PublicKey import RSA
 from Crypto.Cipher import PKCS1_OAEP
 import bcrypt
 import ast 
-import base64
 
 
 #.encode('utf-8')
@@ -48,7 +47,7 @@ class CryptoManager:
         return encrypted_file_data
     
     @staticmethod
-    def decrypt_file_with_aes(password, encrypted_key_data, file_data, output_file_path):
+    def decrypt_file_with_aes(password, encrypted_key_data, file_data, output_file_path=None):
         password = password.encode("utf-8")
         iv = file_data[:16]
         ciphertext = file_data[16:]
@@ -65,6 +64,8 @@ class CryptoManager:
             return
         cipher = AES.new(aes_key, AES.MODE_CBC, iv)
         plaintext = unpad(cipher.decrypt(ciphertext), AES.block_size)
+        if output_file_path is None:
+            return plaintext
         with open(output_file_path, "wb") as file:
             file.write(plaintext)
         print(f"Decryption successful! File saved as: {output_file_path}")

@@ -515,6 +515,7 @@ class ClientIO:
                 aes_key_flag = True
         encrypted_file_data = CryptoManager.encrypt_file_with_aes(password, aes_key, file_path)
         files = {'file': (os.path.basename(file_path), encrypted_file_data.hex().encode())} # files = {'file': (os.path.basename(file_path), encrypted_file_data)}
+        print(files)
         try:
             response = requests.post(f"{SERVER_URL}/upload_file", 
                                      files=files, 
@@ -694,7 +695,7 @@ class ClientIO:
             return False
         return True
     @staticmethod
-    def share_file_IO(username):
+    def share_file_IO(username, password):
         """
         Fetch all users available and allow current user to choose those to share with
         Then send information to server
@@ -838,15 +839,37 @@ class ClientIO:
             print("[ERROR] File shared from others can not be shared again.")  
             return False    
         
-        share_data = {"username": username, "file_id": file_id, "share_info": {}}
-
-        # Server return the encrypted file, and all pk for the selected users to share 
-        for username in selected_usernames: 
-            response = requests.get(f"{SERVER_URL}/get_rsa_key", json={'username': username}) # Need try... except... here, will add tmr
-            user_rsa = response.content
-            share_data['share_info'][f"{username}"] = CryptoManager.encrypt_file_for_sharing(user_rsa, bytes.fromhex(fetched_file['content'])).hex()
+        # share_data = {"username": username, "file_id": file_id, 'shared_users': []}
+        # files = {}
+        
+        # for username in selected_usernames: 
+        #     response = requests.get(f"{SERVER_URL}/get_rsa_key", json={'username': username}) # Need try... except... here, will add tmr
+        #     user_rsa = response.content
+        #     share_data['shared_users'].append(username)
         try:
-            response = requests.post(f"{SERVER_URL}/share_file", json=share_data)
+            response = requests.get(f"{SERVER_URL}/get_aes_key", json={'username': username})
+            if response.status_code == 200:
+                response_data = response.content
+            elif response.status_code in [400, 401, 403]:
+                response_data = response.json()
+                print(response_data["message"])
+                return False
+            else:
+                print("[ERROR] Server error.")
+                return False
+        except requests.exceptions.RequestException as error:
+            print(f"[ERROR] Network error: {error}.")
+            return False
+        plaintext = CryptoManager.decrypt_file_with_aes(password, response_data, bytes.fromhex(fetched_file['content']))
+        share_data = {"username": username, "file_id": file_id, 'shared_user': ''}
+        try:
+            for username in selected_usernames: 
+                response = requests.get(f"{SERVER_URL}/get_rsa_key", json={'username': username})
+                user_rsa = response.content
+                encrypted_content = CryptoManager.encrypt_file_for_sharing(user_rsa, plaintext).hex().encode()
+                files = {'file': ('_', encrypted_content)}
+                share_data['shared_user'] = username
+                response = requests.post(f"{SERVER_URL}/share_file", files=files, data=share_data)
         except requests.exceptions.RequestException as error:
             print(f"[ERROR] Network error: {error}.")
             return False

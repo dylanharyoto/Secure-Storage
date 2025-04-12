@@ -328,20 +328,21 @@ def share_file():
         }
     }
     """
-    username = request.json.get('username')
-    file_id = request.json.get('file_id')
-    share_info = request.json.get('share_info')
-    if not (username and file_id and share_info):
+    username = request.form.get('username')
+    file_id = request.form.get('file_id')
+    shared_user = request.form.get('shared_user')
+    shared_file = request.files.get('file')
+    shared_data = bytes.fromhex(shared_file.read().decode())
+    if not (username and file_id and shared_user and shared_data):
         LogManager.log_action(get_db(config.LOGS_DB), username or "unknown", "share_file", "Missing username or file_id or share_info", "failure")
         return jsonify({"message": "[ERROR] Missing username or file_id or share_info."}), 400
     try:
-        new_ids = FileManager.share_file(get_db(config.FILES_DB), username, file_id, share_info) # to be chnaged when FileManager is static
+        new_id = FileManager.share_file(get_db(config.FILES_DB), username, file_id, shared_user, shared_data) # to be chnaged when FileManager is static
     except Exception as error:
         LogManager.log_action(get_db(config.LOGS_DB), username, "share_file", f"Failed to share file: {str(error)}", "failure")
         return jsonify({"message": f"[ERROR] {str(error)}."}), 403
-    shared_users = ', '.join(share_info.keys())
-    LogManager.log_action(get_db(config.LOGS_DB), username, "share_file", f"Shared file with file_id: {file_id} to users: {shared_users}", "success")
-    return jsonify({"message":"", "shared_file_ids": new_ids}), 200
+    LogManager.log_action(get_db(config.LOGS_DB), username, "share_file", f"Shared file with file_id: {file_id} to user: {shared_user}", "success")
+    return jsonify({"message":"", "shared_file_id": new_id}), 200
 
 # Endpoint: Get all files for a user
 @app.route('/get_files', methods=['GET'])
@@ -392,7 +393,6 @@ def get_aes_key():
         return jsonify({"message": f"[ERROR] {str(error)}."}), 403
     if not aes_key:
         return jsonify({"message": f"[ERROR] AES key for {username} is not found."}), 401
-    print(aes_key)
     return Response(aes_key, mimetype='application/octet-stream'), 200
     #return jsonify({"message": f"[STATUS] AES key for {username} exists.", "aes_key": aes_key}), 200
 

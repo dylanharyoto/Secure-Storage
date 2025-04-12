@@ -71,7 +71,7 @@ class FileManager:
         else:
             raise PermissionError("You do not have permission to delete this file.")
     @staticmethod
-    def share_file(db_conn, username, file_id, share_info):
+    def share_file(db_conn, username, file_id, shared_user, shared_data):
         """
         Share a file with designated users.
         
@@ -102,17 +102,15 @@ class FileManager:
             raise PermissionError("You do not have permission to share this file.")
 
         # For each shared user, insert a new row.
-        new_file_ids = {}
-        for shared_user, shared_content in share_info.items():
-            new_file_id = str(uuid.uuid4())
-            shared_file_name = "shared" + original_file_name
-            cursor.execute(
-                "INSERT INTO files (file_id, owner, file_name, content, access) VALUES (?, ?, ?, ?, ?)",
-                (new_file_id, shared_user, shared_file_name, bytes.fromhex(shared_content), "shared")
-            )
-            new_file_ids[shared_user] = new_file_id
+
+        new_file_id = str(uuid.uuid4())
+        shared_file_name = "shared" + original_file_name
+        cursor.execute(
+            "INSERT INTO files (file_id, owner, file_name, content, access) VALUES (?, ?, ?, ?, ?)",
+            (new_file_id, shared_user, shared_file_name, shared_data, "shared")
+        )
         db_conn.commit()
-        return new_file_ids
+        return new_file_id
     @staticmethod
     def get_files(db_conn, username):
         """
