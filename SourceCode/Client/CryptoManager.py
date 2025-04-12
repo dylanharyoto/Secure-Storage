@@ -7,8 +7,7 @@ import hashlib
 from Crypto.PublicKey import RSA
 from Crypto.Cipher import PKCS1_OAEP
 import bcrypt
-import ast 
-
+import base64
 
 #.encode('utf-8')
 

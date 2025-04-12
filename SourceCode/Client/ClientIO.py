@@ -520,7 +520,6 @@ class ClientIO:
                 aes_key_flag = True
         encrypted_file_data = CryptoManager.encrypt_file_with_aes(password, aes_key, file_path)
         files = {'file': (os.path.basename(file_path), encrypted_file_data.hex().encode())} # files = {'file': (os.path.basename(file_path), encrypted_file_data)}
-        print(files)
         try:
             response = requests.post(f"{SERVER_URL}/upload_file", 
                                      files=files, 
@@ -541,6 +540,8 @@ class ClientIO:
         return True, file_id
     @staticmethod
     def edit_file_IO(username, password):
+        # list all (file id, file name) to facilitate user to specify the file id(s) 
+        ClientIO.check_file_IO(username)
         files_flag = False
         file_id_flag = False
         file_path_flag = False
@@ -650,6 +651,8 @@ class ClientIO:
         return True
     @staticmethod
     def delete_file_IO(username):
+        # list all (file id, file name) to facilitate user to specify the file id(s) 
+        ClientIO.check_file_IO(username)
         file_id_flag = False
         file_id = None
         while not (file_id_flag):
@@ -705,6 +708,8 @@ class ClientIO:
         Fetch all users available and allow current user to choose those to share with
         Then send information to server
         """
+        # list all (file id, file name) to facilitate user to specify the file id(s) 
+        ClientIO.check_file_IO(username)
         file_id_flag = False
         selected_usernames_id_flag = False
         file_id = None
@@ -884,6 +889,8 @@ class ClientIO:
         """
         Download an existing file from the server to a specific directory.
         """
+        # list all (file id, file name) to facilitate user to specify the file id(s) 
+        ClientIO.check_file_IO(username)
         file_id_flag = False
         stored_path_flag = False
         secret_key_flag = False
