@@ -1,4 +1,4 @@
-# Secure-Storage Group 10
+# Secure-Storage
 1. Please install python>=3.11 from https://www.python.org/downloads/release/python-3110/ 
 2. Open Terminal/Powershell, execute the following to import the packages needed into a virtual environment: 
 2.1. cd to Group10/sourcecode/
