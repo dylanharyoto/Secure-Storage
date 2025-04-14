@@ -95,7 +95,7 @@ class Utils:
 
         Parameters:
         - to_email (str): The recipient's email address
-        - recovery_key_content (byte): The recovery key text
+        - recovery_key_content (byte): The updated recovery key of the user
         """
         from_email = "dylanharyoto.polyu@gmail.com"
         from_password = "wyszwoimgqcycevd"
@@ -114,7 +114,7 @@ class Utils:
         msg['To'] = to_email
         msg.attach(MIMEText(body, 'plain'))
 
-        # Attach recovery_key.txt from string
+        # Attach recovery_key.txt 
         recovery_part = MIMEApplication(base64.b64encode(recovery_key_content).decode(), Name="recovery_key.txt")
         recovery_part['Content-Disposition'] = 'attachment; filename="recovery_key.txt"'
         msg.attach(recovery_part)

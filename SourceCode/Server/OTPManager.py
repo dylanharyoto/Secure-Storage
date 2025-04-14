@@ -17,6 +17,7 @@ class OTPManager:
         return str(random.randint(100000, 999999))
     @staticmethod
     def send_otp(to_email, otp):
+        """send OTP to the specified email"""
         from_email = "dylanharyoto.polyu@gmail.com" 
         from_password = "wyszwoimgqcycevd" # dont change
         subject = "Your OTP Code"

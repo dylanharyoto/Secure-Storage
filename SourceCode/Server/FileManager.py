@@ -18,6 +18,9 @@ class FileManager:
 
     @staticmethod
     def check_file_id(db_conn, username, file_id):
+        """
+        Check if a file is owned (either "shared" or "owned" access) a user
+        """
         cursor = db_conn.cursor()
         cursor.execute(
             "SELECT file_id FROM files WHERE file_id = ? AND owner = ?",
@@ -168,34 +171,3 @@ class FileManager:
         user_rsa = cursor.fetchone()
         return user_rsa
 
-
-if __name__ == "__main__":
-    fm = FileManager()
-
-    # Owner uploads a file.
-    owner = "alice"
-    original_file_id = fm.upload_file(owner, "document.txt", b"This is the original file content.")
-    print("Original file ID:", original_file_id)
-
-    # Owner shares the file with Bob and Carol.
-    share_info = {
-        "bob": b"Shared content for Bob.",
-        "carol": b"Shared content for Carol."
-    }
-    shared_ids = fm.share_file(owner, original_file_id, share_info)
-    print("Shared file IDs:", shared_ids)
-
-    # View files for Bob.
-    bob_files = fm.view_files("bob")
-    print("Bob's files:", bob_files)
-
-    # Bob retrieves his shared file.
-    # Use the file id generated during share_file for Bob.
-    bob_file_id = shared_ids.get("bob")
-    if bob_file_id:
-        content, access = fm.get_file("bob", bob_file_id)
-        print("Bob's file content:", content.decode())  # Assuming text content
-        print("File access type:", access)
-
-    
-    

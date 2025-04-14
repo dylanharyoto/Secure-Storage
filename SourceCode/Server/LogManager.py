@@ -13,6 +13,7 @@ class LogManager:
         db_conn.commit()
     
     def get_logs(db_conn):
+        """Query the log from the log database and return"""
         cursor = db_conn.cursor()
         cursor.execute("SELECT timestamp, username, action, details, status FROM logs ORDER BY timestamp DESC")
         return cursor.fetchall()

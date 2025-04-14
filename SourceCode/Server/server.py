@@ -3,14 +3,15 @@ import sqlite3
 import os
 import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
-from SourceCode.Server import config
-from SourceCode.Shared.Utils import Utils
-from SourceCode.Server.FileManager import FileManager
-from SourceCode.Server.UserManager import UserManager
-from SourceCode.Server.OTPManager import OTPManager, OTPMessage
-from SourceCode.Server.PendingManager import PendingManager
-from SourceCode.Server.LogManager import LogManager
+from sourcecode.Server import config
+from sourcecode.Shared.Utils import Utils
+from sourcecode.Server.FileManager import FileManager
+from sourcecode.Server.UserManager import UserManager
+from sourcecode.Server.OTPManager import OTPManager, OTPMessage
+from sourcecode.Server.PendingManager import PendingManager
+from sourcecode.Server.LogManager import LogManager
 
+# import (default) configurations from the /Server/config.py
 app = Flask(__name__)
 app.config[config.USERS_DB] = os.path.join(os.path.dirname(__file__), "Database", "users.db")
 app.config[config.FILES_DB] = os.path.join(os.path.dirname(__file__), "Database", "files.db")
@@ -19,6 +20,7 @@ app.config[config.PENDINGS_DB] = os.path.join(os.path.dirname(__file__), "Databa
 app.config[config.LOGS_DB] = os.path.join(os.path.dirname(__file__), "Database", "logs.db")
 os.makedirs(config.DB_DIR, exist_ok=True)
 
+# define schema of databases 
 users_schema = {
     "username": "TEXT PRIMARY KEY",
     "password": "BLOB NOT NULL",
@@ -53,6 +55,7 @@ logs_schema = {
     "status": "TEXT NOT NULL"
 }
 
+# import (default) configurations from the /Server/config.py
 Utils.init_db(app.config[config.USERS_DB], "users", users_schema)
 Utils.init_db(app.config[config.FILES_DB], "files", files_schema)
 Utils.init_db(app.config[config.OTPS_DB], "otps", otps_schema)
@@ -76,6 +79,7 @@ def close_db(exception = None):
 
 @app.route('/get_logs', methods=['GET'])
 def get_logs():
+    """(only applicable for the administrator account) Get the logs of all users' sensitive actions from the server"""
     data = request.json
     username = data.get('username')
     if not (username):
@@ -103,6 +107,7 @@ def get_logs():
 
 @app.route('/check_username', methods=['GET'])
 def check_username():
+    """check if a username is already registered in the server"""
     data = request.json
     username = data.get('username')
     if not (username):
@@ -116,6 +121,7 @@ def check_username():
 
 @app.route('/get_password', methods=['GET'])
 def get_password():
+    """Get the hashed password of the specified username for client to compare with plaintext input password for authentication"""
     # Here, the get_password API is just to retrieved the stored hashA in server users database
     data = request.json
     username = data.get('username')
@@ -131,6 +137,9 @@ def get_password():
 
 @app.route('/get_registration_otp', methods=['GET'])
 def get_registration_otp():
+    """
+    Send the registration OTP opon a user's registration 
+    """
     username = request.form.get('username')
     password = request.form.get('password')
     public_key = request.form.get('public_key')
@@ -151,6 +160,9 @@ def get_registration_otp():
 
 @app.route('/verify_registration_otp', methods=['POST'])
 def verify_registration_otp():
+    """
+    Verify the registration OTP opon a user's registration to confirm the username as a valid email address for the following 2FA in login
+    """
     data = request.json
     username = data.get('username')
     otp = data.get('otp')
@@ -178,6 +190,7 @@ def verify_registration_otp():
 
 @app.route('/get_login_otp', methods=['GET'])
 def get_login_otp():
+    """send the login OTP after user's password is vaidated to serve as 2FA"""
     data = request.json
     username = data.get('username')
     if not (username):
@@ -192,6 +205,7 @@ def get_login_otp():
 
 @app.route('/verify_login_otp', methods=['POST'])
 def verify_login_otp():
+    """verify the login OTP"""
     data = request.json
     username = data.get('username')
     otp = data.get('otp')
@@ -214,6 +228,7 @@ def verify_login_otp():
 
 @app.route('/get_reset_otp', methods=['GET'])
 def get_reset_otp():
+    """send the OTP to a user's email for resetting password after confirming the recovery_key is correct"""
     data = request.json
     username = data.get('username')
     if not username:
@@ -228,6 +243,7 @@ def get_reset_otp():
 
 @app.route('/verify_reset_otp', methods=['POST'])
 def verify_reset_otp():
+    """validate the resetting password OTP"""
     username = request.form.get('username')
     otp = request.form.get('otp')
     new_password = request.form.get('new_password')  
@@ -251,6 +267,7 @@ def verify_reset_otp():
 
 @app.route('/check_file_id', methods=['GET'])
 def check_file_id():
+    """check the file id is existed in the files database or not"""
     username = request.json.get('username')
     file_id = request.json.get('file_id')
     if not (username and file_id):
@@ -280,9 +297,10 @@ def upload_file():
     LogManager.log_action(get_db(config.LOGS_DB), username, "upload_file", f"Uploaded file '{file.filename}' with file_id: {file_id}", "success")
     return jsonify({"message": f"[STATUS] File '{file.filename}' uploaded successfully.", "file_id": file_id}), 200
 
-# Endpoint: Edit a file (only if owned by the requester)
+
 @app.route('/edit_file', methods=['POST'])
 def edit_file():
+    """Edit a file (only if owned by the requester)"""
     username = request.form.get('username')
     file_id = request.form.get('file_id')
     new_file = request.files.get('file')
@@ -298,9 +316,10 @@ def edit_file():
     LogManager.log_action(get_db(config.LOGS_DB), username, "edit_file", f"Edited file with file_id: {file_id}", "success")
     return jsonify({"message": "f[STATUS] File '{file_id}' uploaded successfully."}), 200
 
-# Endpoint: Delete a file (only if owned by the requester)
+
 @app.route('/delete_file', methods=['POST'])
 def delete_file():
+    """Delete a file (only if owned by the requester)"""
     username = request.json.get('username')
     file_id = request.json.get('file_id')
     if not (username and file_id):
@@ -314,17 +333,18 @@ def delete_file():
     LogManager.log_action(get_db(config.LOGS_DB), username, "delete_file", f"Deleted file with file_id: {file_id}", "success")
     return jsonify({"message": f"[STATUS] File '{file_id}' deleted successfully."}), 200
 
-# Endpoint: Share a file
+
 @app.route('/share_file', methods=['POST'])
 def share_file():
     """
+    Share a file
     Expected JSON payload:
     {
         "username": "alice",
         "file_id": "original_file_id",
         "share_info": {
-            "bob": "Bob's shared file content (base64 or text)",
-            "carol": "Carol's shared file content"
+            "bob": "Bob's shared file content (hex)",
+            "carol": "Carol's shared file content (hex)"
         }
     }
     """
@@ -344,9 +364,9 @@ def share_file():
     LogManager.log_action(get_db(config.LOGS_DB), username, "share_file", f"Shared file with file_id: {file_id} to user: {shared_user}", "success")
     return jsonify({"message":"", "shared_file_id": new_id}), 200
 
-# Endpoint: Get all files for a user
 @app.route('/get_files', methods=['GET'])
 def get_files():
+    """Get all files (i.e., the list of triples: (fileID, fileName, access))for a user"""
     username = request.json.get('username')
     if not username:
         return jsonify({"message": "[ERROR] Missing username."}), 400
@@ -356,23 +376,25 @@ def get_files():
         return jsonify({"message": f"[ERROR] {str(error)}."}), 403
     return jsonify({"message": f"[STATUS] Files for {username} fetched successfully.", "files": files}), 200
 
-# Endpoint: View a file's content
+
 @app.route('/view_file', methods=['GET'])
 def view_file():
+    """View (Download) a file's encrypted content"""
     username = request.json.get('username')
     file_id = request.json.get('file_id')
     if not (username and file_id):
         return jsonify({"message": "[ERROR] Missing username or file_id."}), 400
     try:
         content, access, file_name = FileManager.view_file(get_db(config.FILES_DB), username, file_id)
-        # Assuming text content; adjust if binary data (e.g., use base64 encoding)
+       
     except Exception as error:
         return jsonify({"message": f"[ERROR] {str(error)}."}), 403
     return jsonify({"message":f"[STATUS] File '{file_id}' fetched successfully.", "content": content.hex(), "access": access, "file_name": file_name}), 200
     
-# Endpoint: Get users
+
 @app.route('/get_users', methods=['GET'])
 def get_users():
+    """Get the list of users"""
     usernames = None
     try:
         usernames = FileManager.get_users(get_db(config.USERS_DB))
@@ -381,35 +403,38 @@ def get_users():
     usernames = ",".join(usernames)
     return jsonify({"message": "Fetched all users successfully.", "usernames": usernames}), 200
 
-# Endpoint: Get AES key
+
 @app.route('/get_aes_key', methods=['GET'])
 def get_aes_key():
+    """Get Encrypted AES key of the specified user"""
     username = request.json.get('username')
     if not (username):
         return jsonify({"message": "[ERROR] Missing username."}), 400
     try:
-        aes_key = FileManager.get_aes_key(get_db(config.USERS_DB), username) # to be changed when FileManager is static
+        aes_key = FileManager.get_aes_key(get_db(config.USERS_DB), username) 
     except Exception as error:
         return jsonify({"message": f"[ERROR] {str(error)}."}), 403
     if not aes_key:
         return jsonify({"message": f"[ERROR] AES key for {username} is not found."}), 401
     return Response(aes_key, mimetype='application/octet-stream'), 200
-    #return jsonify({"message": f"[STATUS] AES key for {username} exists.", "aes_key": aes_key}), 200
+    
 
-# Endpoint: Get RSA key
+
 @app.route('/get_rsa_key', methods=['GET'])
 def get_rsa_key():
+    """Get the public key of the specified user to encrypt a shared_file"""
     username = request.json.get('username')
     if not (username):
         return jsonify({"message": "[ERROR] Missing username."}), 400
     try:
-        rsa_key = FileManager.get_rsa_key(get_db(config.USERS_DB), username) # to be changed when FileManager is static
+        rsa_key = FileManager.get_rsa_key(get_db(config.USERS_DB), username) 
     except Exception as error:
         return jsonify({"message": f"[ERROR] {str(error)}."}), 403
     if not rsa_key:
         return jsonify({"message": f"[ERROR] RSA key for {username} is not found."}), 401
     return Response(rsa_key, mimetype='application/octet-stream'), 200
-    #return jsonify({"message": f"[STATUS] RSA key for {username} exists.", "rsa_key": rsa_key}), 200
+   
 
 if __name__ == "__main__":
+    # By default, the server is running on 5100 port and hosted on 0.0.0.0
     app.run(host="0.0.0.0", port=5100, debug=True)

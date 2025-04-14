@@ -1,9 +1,10 @@
 import requests
 import time
 import os
-from SourceCode.Shared.Utils import Utils
-from SourceCode.Client.CryptoManager import CryptoManager
+from sourcecode.Shared.Utils import Utils
+from sourcecode.Client.CryptoManager import CryptoManager
 
+# By default, the server is running on 5100 port and hosted on localhost (0.0.0.0)
 SERVER_URL = os.getenv("SERVER_URL", "http://localhost:5100")
 class ClientIO:
     @staticmethod

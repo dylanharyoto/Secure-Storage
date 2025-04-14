@@ -1,8 +1,8 @@
 import sys
 import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
-from SourceCode.Client.ClientIO import ClientIO
-from SourceCode.Server import config
+from sourcecode.Client.ClientIO import ClientIO
+from sourcecode.Server import config
 
 ADMIN_USER = config.ADMIN_USER
 

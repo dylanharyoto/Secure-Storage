@@ -1,5 +1,5 @@
-from SourceCode.Shared.Utils import Utils
-from SourceCode.Client.CryptoManager import CryptoManager
+from sourcecode.Shared.Utils import Utils
+from sourcecode.Client.CryptoManager import CryptoManager
 
 class UserManager:
     @staticmethod
